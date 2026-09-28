@@ -2,7 +2,7 @@
 // Fornecedores e meios de pagamento
 //
 // Dado bancário de fornecedor é o vetor clássico de fraude
-// em organização: alterar a chave PIX pouco antes de um
+// em produtora: alterar a chave PIX pouco antes de um
 // pagamento grande. Por isso fica em tabela separada, só
 // visível para quem confirma pagamento, e toda alteração
 // é registrada.

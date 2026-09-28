@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════
 // Repasses — o dinheiro que entra
 //
-// Espelha as Solicitações: fonte → repasse → parcela → recebimento.
+// Espelha as Solicitações: fonte → receita → parcela → recebimento.
 // Recebido é a soma dos recebimentos; estorno é registro negativo.
 // ═══════════════════════════════════════════════════════
 
@@ -481,7 +481,7 @@ async function modalFontes(alvo) {
   };
   const q = s => document.querySelector(s);
 
-  // contratos anteriores da mesma empresa, para copiar fontes
+  // eventos anteriores da mesma empresa, para copiar fontes
   let outros = [];
   try {
     const emp = empresaAtual();

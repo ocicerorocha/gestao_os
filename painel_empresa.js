@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════
 // Painel da empresa — a visão consolidada da organização
 //
-// Junta os contratos: orçado, pago, repasse, recebido, resultado.
-// Linha temporal repasse × gastos, comparativo por contrato,
+// Junta os contratos: orçado, pago, receita, recebido, resultado.
+// Linha temporal receita × gastos, comparativo por contrato,
 // a receber × a pagar. Tudo respeita o olhinho (moeda mascara).
 // ═══════════════════════════════════════════════════════
 
@@ -25,14 +25,14 @@ export async function telaPainelEmpresa() {
   alvo.innerHTML = `<div style="padding:40px;text-align:center;color:var(--texto-2)">Carregando o painel...</div>`;
 
   try {
-    const [contratos, fluxo, fluxoDia, agPagar, agReceber] = await Promise.all([
+    const [eventos, fluxo, fluxoDia, agPagar, agReceber] = await Promise.all([
       resumoEventos(emp.id),
       fluxoMensal(emp.id),
       fluxoDiario(emp.id).catch(() => []),
       listarAgenda(emp.id).catch(() => []),
       listarAgendaReceita(emp.id).catch(() => []),
     ]);
-    _dados = { emp, contratos, fluxo, fluxoDia, agPagar, agReceber };
+    _dados = { emp, eventos, fluxo, fluxoDia, agPagar, agReceber };
   } catch (e) {
     alvo.innerHTML = `<div class="vazio"><h3>Não consegui abrir o painel</h3><p>${esc(e.message)}</p></div>`;
     return;
@@ -50,12 +50,12 @@ function rotuloMes(iso) {
 function desenhar() {
   const alvo = document.querySelector('#conteudo');
   if (!_dados) return;
-  const { contratos, agPagar, agReceber } = _dados;
+  const { eventos, agPagar, agReceber } = _dados;
 
   const cEv = { planejamento:0, em_execucao:0, encerrado:0 };
   eventos.forEach(e => { const s = e.situacao || 'planejamento'; if (cEv[s] != null) cEv[s]++; });
   const hojeD = new Date(); hojeD.setHours(0, 0, 0, 0);
-  const proximos = contratos
+  const proximos = eventos
     .filter(e => e.data_inicio && new Date(e.data_inicio + 'T00:00:00') >= hojeD)
     .sort((a, b) => String(a.data_inicio).localeCompare(String(b.data_inicio)))
     .slice(0, 5);
@@ -101,7 +101,7 @@ function desenhar() {
       <div class="metrica"><div class="rotulo">Recebido</div><div class="valor" style="color:var(--verde)">${moeda(recebido)}</div></div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:10px">
-      <div class="metrica"><div class="rotulo">Resultado previsto (repasse − orçado)</div><div class="valor" style="color:${resPrev >= 0 ? 'var(--verde)' : 'var(--vermelho)'}">${resPrev >= 0 ? '+' : ''}${moeda(resPrev)}</div></div>
+      <div class="metrica"><div class="rotulo">Resultado previsto (receita − orçado)</div><div class="valor" style="color:${resPrev >= 0 ? 'var(--verde)' : 'var(--vermelho)'}">${resPrev >= 0 ? '+' : ''}${moeda(resPrev)}</div></div>
       <div class="metrica"><div class="rotulo">Resultado real (recebido − pago)</div><div class="valor" style="color:${resReal >= 0 ? 'var(--verde)' : 'var(--vermelho)'}">${resReal >= 0 ? '+' : ''}${moeda(resReal)}</div></div>
     </div>
 

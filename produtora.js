@@ -17,9 +17,9 @@ export async function telaProdutora() {
   }
 
   const podeEditar = souAdmin(emp.id);
-  let contratos = [], fornecedores = [];
+  let eventos = [], fornecedores = [];
   try {
-    [contratos, fornecedores] = await Promise.all([listarEventos(), listarFornecedores(emp.id)]);
+    [eventos, fornecedores] = await Promise.all([listarEventos(), listarFornecedores(emp.id)]);
   } catch (e) { /* números são complemento; a tela funciona sem eles */ }
 
   const meu = sessao.membros.find(m => m.empresa?.id === emp.id);

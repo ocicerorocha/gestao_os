@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════
-// Contas — saldo por conta + fluxo de caixa (nível organização)
+// Contas — saldo por conta + fluxo de caixa (nível produtora)
 //
 // Conta é só um NOME. Ao pagar marca "de onde saiu", ao receber
 // "onde entrou". A aba mostra o saldo de cada conta e o extrato

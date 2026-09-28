@@ -8,7 +8,7 @@ import { abaProducao } from './producao.js';
 import { abaSolicitacoes, abaAprovacoes } from './solicitacoes.js';
 import { abaReceitas } from './receitas.js';
 
-export const contexto = { contrato: null, permissao: null, itens: [], aba: 'painel' };
+export const contexto = { evento: null, permissao: null, itens: [], aba: 'painel' };
 
 const ABAS = [
   { id: 'painel',       rotulo: 'Painel' },
@@ -95,7 +95,7 @@ function desenhar() {
   if (btnExcluir) btnExcluir.addEventListener('click', async () => {
     const n = (contexto.itens || []).length;
     if (n > 0) {
-      const r = prompt(`Este contrato tem ${n} item(ns). Excluir APAGA o contrato e TODOS os seus dados (itens, solicitações, pagamentos, repasses). Ação irreversível.\n\nDigite EXCLUIR para confirmar:`);
+      const r = prompt(`Este contrato tem ${n} item(ns). Excluir APAGA o contrato e TODOS os seus dados (itens, solicitações, pagamentos, receitas). Ação irreversível.\n\nDigite EXCLUIR para confirmar:`);
       if (r !== 'EXCLUIR') return;
     } else {
       if (!confirm('Excluir este contrato? Esta ação é irreversível.')) return;
@@ -150,11 +150,11 @@ async function abaPainel(alvo) {
     (await andamentoItens(ev.id)).forEach(a => { andamento[a.item_id] = a; });
   } catch (e) { /* segue sem o financeiro; o orçamento ainda aparece */ }
 
-  // repasses — só para quem pode ver (dado sensível)
+  // receitas — só para quem pode ver (dado sensível)
   const podeVerReceitas = contexto.permissao?.admin || contexto.permissao?.ver_receitas;
-  let repasses = [];
+  let receitas = [];
   if (podeVerReceitas) {
-    try { repasses = await listarReceitas(ev.id); } catch (e) { repasses = []; }
+    try { receitas = await listarReceitas(ev.id); } catch (e) { receitas = []; }
   }
 
   // ── números ──
@@ -182,7 +182,7 @@ async function abaPainel(alvo) {
   });
   const cats = Object.entries(porCategoria).sort((a, b) => b[1].orcado - a[1].orcado);
 
-  // repasses: totais, resultado e por fonte
+  // receitas: totais, resultado e por fonte
   const receitaPrevista = receitas.reduce((a, r) => a + Number(r.valor_previsto || 0), 0);
   const recebido = receitas.reduce((a, r) => a + Number(r.recebido || 0), 0);
   const resultadoPrevisto = receitaPrevista - orcado;
@@ -256,7 +256,7 @@ async function abaPainel(alvo) {
           <div><div class="rotulo">Previsto</div><div style="font-weight:700;font-size:18px;color:${resultadoPrevisto >= 0 ? 'var(--verde)' : 'var(--vermelho)'}">${resultadoPrevisto >= 0 ? '+' : ''}${moeda(resultadoPrevisto)}</div></div>
           <div style="text-align:right"><div class="rotulo">Fluxo real</div><div style="font-weight:700;font-size:18px;color:${resultadoReal >= 0 ? 'var(--verde)' : 'var(--vermelho)'}">${resultadoReal >= 0 ? '+' : ''}${moeda(resultadoReal)}</div></div>
         </div>
-        <div class="rotulo" style="margin-top:6px">previsto = repasse − orçado · real = recebido − pago</div>
+        <div class="rotulo" style="margin-top:6px">previsto = receita − orçado · real = recebido − pago</div>
       </div>` : ''}
     </div>
 
@@ -388,7 +388,7 @@ async function abaPainel(alvo) {
     el.addEventListener('click', () => { contexto.aba = 'producao'; desenhar(); }));
   alvo.querySelector('#ev-pdf')?.addEventListener('click', () => window.print());
   alvo.querySelector('#ev-encerrar')?.addEventListener('click', async () => {
-    if (!confirm('Encerrar este contrato? Isso trava novos lançamentos (itens, solicitações, repasses). Dá pra reabrir depois mudando a situação no cadastro do contrato.')) return;
+    if (!confirm('Encerrar este contrato? Isso trava novos lançamentos (itens, solicitações, receitas). Dá pra reabrir depois mudando a situação no cadastro do contrato.')) return;
     try {
       await encerrarEvento(ev.id);
       contexto.evento.situacao = 'encerrado';

@@ -1,10 +1,10 @@
 // ═══════════════════════════════════════════════════════
 // Documentos — todos os anexos da organização, num lugar só
 //
-// Junta os documentos ligados a itens de produção e aos repasses
+// Junta os documentos ligados a itens de produção e o repasses
 // de todos os contratos da organização ativa. Filtros por contrato,
 // por categoria e busca por nome (do arquivo, do item ou da
-// repasse). Abrir usa link temporário; o depósito é fechado.
+// receita). Abrir usa link temporário; o depósito é fechado.
 // ═══════════════════════════════════════════════════════
 
 import { empresaAtual, souAdmin, listarDocumentosEmpresa, linkDocumento, apagarDocumento } from './nucleo.js';
@@ -52,7 +52,7 @@ function iconeArquivo(tipo, nome) {
 function pintar() {
   const alvo = document.querySelector('#conteudo');
 
-  const contratos = [...new Map(_docs.map(d => [d.evento_id, d.evento_nome])).entries()]
+  const eventos = [...new Map(_docs.map(d => [d.evento_id, d.evento_nome])).entries()]
     .map(([id, nome]) => ({ id, nome })).sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
   const categorias = [...new Set(_docs.map(d => d.categoria).filter(Boolean))].sort();
 
@@ -76,7 +76,7 @@ function pintar() {
     </div>
 
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
-      <input class="controle" id="d-busca" placeholder="Buscar por arquivo, item, repasse ou categoria"
+      <input class="controle" id="d-busca" placeholder="Buscar por arquivo, item, receita ou categoria"
              value="${esc(_busca)}" style="flex:1;min-width:220px">
       <select class="controle" id="d-evento" style="width:auto;min-width:150px">
         <option value="">Todos os contratos</option>

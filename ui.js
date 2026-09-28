@@ -226,7 +226,7 @@ export function lerMoeda(input) {
   return d ? parseInt(d, 10) / 100 : 0;
 }
 
-/* ── anexos (documentos ligados a item / repasse) ──── */
+/* ── anexos (documentos ligados a item / receita) ──── */
 // Monta um bloco de documentos dentro de `container`.
 // opts = { carregar, anexar, apagar, abrir, podeGerir }
 //   carregar()          → Promise<doc[]>   (id, nome, categoria, caminho, tamanho, tipo, criado_em)

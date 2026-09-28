@@ -2,7 +2,7 @@
 // Produção — os itens orçados do contrato
 //
 // A tabela mostra só o essencial: item, categoria, custo do
-// contrato anterior e valor orçado. Quantidade e diária existem
+// evento anterior e valor orçado. Quantidade e diária existem
 // como calculadora recolhida no cadastro, para os casos em que
 // a conta importa — cachê de equipe, rádios, hospedagem.
 // ═══════════════════════════════════════════════════════

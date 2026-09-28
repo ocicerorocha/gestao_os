@@ -20,9 +20,9 @@ export async function telaEventos() {
   const alvo = app.querySelector('#conteudo');
   alvo.innerHTML = `<div style="padding:40px;text-align:center;color:var(--texto-2)">Carregando contratos...</div>`;
 
-  let contratos;
+  let eventos;
   try {
-    contratos = await listarEventos();
+    eventos = await listarEventos();
   } catch (e) {
     alvo.innerHTML = `<div class="vazio"><h3>Não consegui carregar</h3><p>${esc(e.message)}</p></div>`;
     return;
@@ -46,9 +46,9 @@ export async function telaEventos() {
 
   // Agrupa por organização — uma pessoa pode atender mais de uma
   const grupos = new Map();
-  for (const ev of contratos) {
+  for (const ev of eventos) {
     const chave = ev.empresa?.id || 'sem';
-    if (!grupos.has(chave)) grupos.set(chave, { empresa: ev.empresa, contratos: [] });
+    if (!grupos.has(chave)) grupos.set(chave, { empresa: ev.empresa, eventos: [] });
     grupos.get(chave).eventos.push(ev);
   }
 

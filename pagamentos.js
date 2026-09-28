@@ -66,7 +66,7 @@ function desenhar(alvo) {
   if (_filtroEvento) linhas = linhas.filter(l => l.evento_id === _filtroEvento);
   if (_soUrgentes)   linhas = linhas.filter(l => l.urgente);
 
-  const contratos = [...new Map(_linhas.map(l => [l.evento_id, l.evento_nome])).entries()];
+  const eventos = [...new Map(_linhas.map(l => [l.evento_id, l.evento_nome])).entries()];
   const h = hoje();
 
   const vencidas = linhas.filter(l => l.vencimento && l.vencimento < h);
@@ -244,7 +244,7 @@ function nomeDoDia(iso) {
 function renderPagos(alvo) {
   let pagos = _pagos;
   if (_filtroEvento) pagos = pagos.filter(p => p.evento_id === _filtroEvento);
-  const contratos = [...new Map(_pagos.map(p => [p.evento_id, p.evento_nome])).entries()];
+  const eventos = [...new Map(_pagos.map(p => [p.evento_id, p.evento_nome])).entries()];
   const total = pagos.reduce((a, p) => a + Number(p.valor || 0), 0);
 
   alvo.innerHTML = `
