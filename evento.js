@@ -12,11 +12,10 @@ export const contexto = { evento: null, permissao: null, itens: [], aba: 'painel
 
 const ABAS = [
   { id: 'painel',       rotulo: 'Painel' },
-  { id: 'producao',     rotulo: 'Produção' },
+  { id: 'producao',     rotulo: 'Descritivo' },
   { id: 'solicitacoes', rotulo: 'Solicitações' },
   { id: 'aprovacoes',   rotulo: 'Aprovações', perm: 'aprovar_pagamento' },
   { id: 'receitas',     rotulo: 'Repasses',   perm: 'ver_receitas' },
-  { id: 'bilheteria',   rotulo: 'Bilheteria', embreve: true },
 ];
 
 function abasVisiveis() {
@@ -133,8 +132,8 @@ async function abaPainel(alvo) {
     alvo.innerHTML = `
       <div class="vazio">
         <h3>Orçamento vazio</h3>
-        <p>Comece cadastrando os itens na aba Produção, ou importe a planilha do contrato anterior.</p>
-        <button class="botao botao-primario" id="ir-producao">Ir para Produção</button>
+        <p>Comece cadastrando os itens na aba Descritivo, ou importe a planilha do contrato anterior.</p>
+        <button class="botao botao-primario" id="ir-producao">Ir para Descritivo</button>
       </div>`;
     alvo.querySelector('#ir-producao')?.addEventListener('click', () => {
       contexto.aba = 'producao'; desenhar();
@@ -256,7 +255,7 @@ async function abaPainel(alvo) {
           <div><div class="rotulo">Previsto</div><div style="font-weight:700;font-size:18px;color:${resultadoPrevisto >= 0 ? 'var(--verde)' : 'var(--vermelho)'}">${resultadoPrevisto >= 0 ? '+' : ''}${moeda(resultadoPrevisto)}</div></div>
           <div style="text-align:right"><div class="rotulo">Fluxo real</div><div style="font-weight:700;font-size:18px;color:${resultadoReal >= 0 ? 'var(--verde)' : 'var(--vermelho)'}">${resultadoReal >= 0 ? '+' : ''}${moeda(resultadoReal)}</div></div>
         </div>
-        <div class="rotulo" style="margin-top:6px">previsto = receita − orçado · real = recebido − pago</div>
+        <div class="rotulo" style="margin-top:6px">previsto = repasse − orçado · real = recebido − pago</div>
       </div>` : ''}
     </div>
 
