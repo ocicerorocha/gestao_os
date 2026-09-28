@@ -111,7 +111,7 @@ async function lerArquivo(f) {
 
 let _xlsx = null;
 async function carregarXLSX() {
-  if (!_xlsx) _xlsx = await import('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm');
+  if (!_xlsx) _xlsx = await import('./vendor/xlsx.js');
   return _xlsx;
 }
 

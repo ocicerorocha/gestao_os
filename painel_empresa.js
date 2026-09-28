@@ -192,7 +192,7 @@ function cartaoEvento(e) {
 async function desenharGraficos() {
   if (!_Chart) {
     try {
-      const mod = await import('https://cdn.jsdelivr.net/npm/chart.js@4.4.1/auto/+esm');
+      const mod = await import('./vendor/chart.js');
       _Chart = mod.Chart || mod.default;
     } catch (e) { return; /* sem internet pro CDN: segue sem gráfico */ }
   }

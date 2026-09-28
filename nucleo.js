@@ -10,7 +10,7 @@
 // jsDelivr entrega o pacote em um arquivo só, já empacotado.
 // É mais estável que alternativas que montam a biblioteca em vários
 // pedaços — se um pedaço falha, nada carrega e a tela trava.
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
+import { createClient } from './vendor/supabase-js.js';
 import { SUPABASE_URL, SUPABASE_CHAVE } from './config.js';
 
 export const bd = createClient(SUPABASE_URL, SUPABASE_CHAVE, {

@@ -603,7 +603,7 @@ async function modalPrestacao(item) {
 /* ── exportar a produção para planilha (.xlsx) ─────── */
 async function exportarPlanilha(itens) {
   try {
-    const XLSX = await import('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm');
+    const XLSX = await import('./vendor/xlsx.js');
     const ev = contexto.evento;
     const SIT = { previsto:'Previsto', orcado:'Orçado', contratado:'Contratado', cancelado:'Cancelado' };
     const linhas = itens.map(i => {
