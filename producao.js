@@ -319,7 +319,7 @@ function modalItem(item) {
       <div class="campo">
         <label for="i-desc">Item</label>
         <input class="controle" id="i-desc" value="${esc(i.descricao || '')}"
-               placeholder="Sonorização do palco principal" required>
+               placeholder="Descrição do item ou serviço" required>
       </div>
 
       <div class="linha linha-2">
@@ -553,7 +553,7 @@ async function modalPrestacao(item) {
         <div class="linha linha-2">
           <div class="campo" style="margin-bottom:10px">
             <label for="pc-desc">Gasto</label>
-            <input class="controle" id="pc-desc" placeholder="Combustível da van" required>
+            <input class="controle" id="pc-desc" placeholder="Descrição da despesa" required>
           </div>
           <div class="campo" style="margin-bottom:10px">
             <label for="pc-valor">Valor</label>
@@ -622,8 +622,8 @@ async function exportarPlanilha(itens) {
     });
     const ws = XLSX.utils.json_to_sheet(linhas);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Produção');
-    const nome = `Producao_${String(ev?.nome || 'evento').replace(/[^\w]+/g, '_')}.xlsx`;
+    XLSX.utils.book_append_sheet(wb, ws, 'Descritivo');
+    const nome = `Descritivo_${String(ev?.nome || 'contrato').replace(/[^\w]+/g, '_')}.xlsx`;
     XLSX.writeFile(wb, nome);
   } catch (e) {
     aviso('Não consegui exportar: ' + e.message, 'erro');
