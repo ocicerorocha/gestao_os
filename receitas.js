@@ -99,7 +99,7 @@ function desenhar(alvo) {
           <tbody>${lista.map(linha).join('')}</tbody>
           <tfoot>
             <tr>
-              <td colspan="2">${lista.length} ${lista.length === 1 ? 'receita' : 'receitas'}</td>
+              <td colspan="2">${lista.length} ${lista.length === 1 ? 'repasse' : 'repasses'}</td>
               <td class="num" style="font-weight:600">${moeda(lista.reduce((a, r) => a + Number(r.valor_previsto || 0), 0))}</td>
               <td class="num" style="font-weight:600;color:var(--verde)">${moeda(lista.reduce((a, r) => a + Number(r.recebido || 0), 0))}</td>
               <td></td>
@@ -147,7 +147,7 @@ function modalNova(alvo) {
     abrirModal('Novo repasse', `
       <div class="vazio" style="border:none;padding:20px 0">
         <h3>Nenhuma fonte cadastrada</h3>
-        <p>Cadastre ao menos uma fonte de repasse antes (bilheteria, patrocínio…).</p>
+        <p>Cadastre ao menos uma fonte de recurso antes (convênio, edital, contrato de gestão…).</p>
       </div>
       <div class="modal-acoes">
         <button class="botao" id="rn-fechar">Fechar</button>
@@ -175,7 +175,7 @@ function modalNova(alvo) {
 
       <div class="campo">
         <label for="r-desc">Descrição</label>
-        <input class="controle" id="r-desc" placeholder="Cota de patrocínio master">
+        <input class="controle" id="r-desc" placeholder="Ex.: 1ª parcela do convênio">
       </div>
       <div class="campo">
         <label for="r-pagador">Pagador</label>
@@ -369,7 +369,7 @@ function modalDetalhe(id, alvo) {
     if (!confirm('Apagar este repasse? Fica registrado na auditoria.')) return;
     try {
       await apagarReceita(id);
-      aviso('Repasse apagada.');
+      aviso('Repasse apagado.');
       fecharModal();
       await abaReceitas(alvo);
     } catch (e) { aviso(e.message, 'erro'); }
