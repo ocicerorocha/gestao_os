@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════
-// Importação assistida da planilha do evento anterior
+// Importação assistida da planilha do contrato anterior
 //
 // Quatro passos: enviar, dizer o que é cada coluna, acertar
 // as categorias, revisar e gravar.
@@ -46,14 +46,14 @@ function etapaArquivo() {
   const jaTem = contexto.itens.length;
   abrirModal('Importar planilha', `
     <p style="font-size:14px;color:var(--texto-2);margin-bottom:16px">
-      Envie a planilha do evento anterior como ela é. Você confere e corrige tudo
+      Envie a planilha do contrato anterior como ela é. Você confere e corrige tudo
       antes de qualquer coisa ser gravada.
     </p>
 
     ${jaTem ? `
       <div class="cartao" style="background:var(--ambar-fundo);border-color:var(--ambar);margin-bottom:14px">
         <div style="font-size:13px;color:var(--ambar);margin-bottom:10px">
-          Este evento já tem ${jaTem} ${jaTem === 1 ? 'item' : 'itens'}.
+          Este contrato já tem ${jaTem} ${jaTem === 1 ? 'item' : 'itens'}.
         </div>
         <label class="caixa-perm" style="margin-bottom:6px">
           <input type="radio" name="modo" value="acrescentar" checked>

@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════
-// Eventos — lista por produtora e cadastro
+// Contratos — lista por organização e cadastro
 // ═══════════════════════════════════════════════════════
 
 import {
@@ -18,11 +18,11 @@ const FONTES_SUGERIDAS = ['Conta própria', 'Bilheteria', 'Patrocinador'];
 export async function telaEventos() {
   const app = document.getElementById('app');
   const alvo = app.querySelector('#conteudo');
-  alvo.innerHTML = `<div style="padding:40px;text-align:center;color:var(--texto-2)">Carregando eventos...</div>`;
+  alvo.innerHTML = `<div style="padding:40px;text-align:center;color:var(--texto-2)">Carregando contratos...</div>`;
 
-  let eventos;
+  let contratos;
   try {
-    eventos = await listarEventos();
+    contratos = await listarEventos();
   } catch (e) {
     alvo.innerHTML = `<div class="vazio"><h3>Não consegui carregar</h3><p>${esc(e.message)}</p></div>`;
     return;
@@ -32,31 +32,31 @@ export async function telaEventos() {
 
   if (!eventos.length) {
     alvo.innerHTML = `
-      <div class="pagina-topo"><h1>Eventos</h1></div>
+      <div class="pagina-topo"><h1>Contratos</h1></div>
       <div class="vazio">
-        <h3>Nenhum evento ainda</h3>
+        <h3>Nenhum contrato ainda</h3>
         <p>${podeCriar
-            ? 'Comece cadastrando o primeiro evento da produtora.'
-            : 'Você ainda não recebeu acesso a nenhum evento.'}</p>
-        ${podeCriar ? `<button class="botao botao-primario" id="novo">Cadastrar evento</button>` : ''}
+            ? 'Comece cadastrando o primeiro contrato da organização.'
+            : 'Você ainda não recebeu acesso a nenhum contrato.'}</p>
+        ${podeCriar ? `<button class="botao botao-primario" id="novo">Cadastrar contrato</button>` : ''}
       </div>`;
     alvo.querySelector('#novo')?.addEventListener('click', () => modalEvento(null, telaEventos));
     return;
   }
 
-  // Agrupa por produtora — uma pessoa pode atender mais de uma
+  // Agrupa por organização — uma pessoa pode atender mais de uma
   const grupos = new Map();
-  for (const ev of eventos) {
+  for (const ev of contratos) {
     const chave = ev.empresa?.id || 'sem';
-    if (!grupos.has(chave)) grupos.set(chave, { empresa: ev.empresa, eventos: [] });
+    if (!grupos.has(chave)) grupos.set(chave, { empresa: ev.empresa, contratos: [] });
     grupos.get(chave).eventos.push(ev);
   }
 
   alvo.innerHTML = `
     <div class="pagina-topo">
-      <h1>Eventos</h1>
+      <h1>Contratos</h1>
       <div class="espaco"></div>
-      ${podeCriar ? `<button class="botao botao-primario" id="novo">Novo evento</button>` : ''}
+      ${podeCriar ? `<button class="botao botao-primario" id="novo">Novo contrato</button>` : ''}
     </div>
     ${[...grupos.values()].map(g => grupoHTML(g, true)).join('')}
   `;
@@ -74,7 +74,7 @@ export async function telaEventos() {
 }
 
 function grupoHTML(g, mostrarCabeca) {
-  const emp = g.empresa || { nome: 'Sem produtora' };
+  const emp = g.empresa || { nome: 'Sem organização' };
   return `
     <div class="grupo-empresa">
       ${mostrarCabeca ? `
@@ -107,7 +107,7 @@ function cartaoHTML(ev) {
             ? `<span style="font-size:12px;color:var(--texto-3)">${numero(ev.publico_estimado)} pessoas</span>`
             : ''}
           <span style="flex:1"></span>
-          <span class="botao-icone" data-config="${esc(ev.id)}" title="Editar dados do evento">&#9881;</span>
+          <span class="botao-icone" data-config="${esc(ev.id)}" title="Editar dados do contrato">&#9881;</span>
         </div>
       </div>
     </button>`;
@@ -128,28 +128,28 @@ async function modalEvento(id, aoSalvar) {
   }
 
   const empresas = edicao ? [] : empresasOndeCrio();
-  if (!edicao && !empresas.length) return aviso('Você não pode criar eventos.', 'erro');
+  if (!edicao && !empresas.length) return aviso('Você não pode criar contratos.', 'erro');
 
   const podeEditar = edicao ? souAdmin(ev.empresa?.id) : true;
 
-  abrirModal(edicao ? ev.nome : 'Novo evento', `
+  abrirModal(edicao ? ev.nome : 'Novo contrato', `
     <form id="fev">
       ${!edicao && empresas.length > 1 ? `
         <div class="campo">
-          <label for="ev-empresa">Produtora</label>
+          <label for="ev-empresa">Organização</label>
           <select class="controle" id="ev-empresa">
             ${empresas.map(e => `<option value="${esc(e.id)}">${esc(e.nome)}</option>`).join('')}
           </select>
         </div>` : ''}
 
       <div class="campo">
-        <label for="ev-nome">Nome do evento</label>
+        <label for="ev-nome">Nome do contrato</label>
         <input class="controle" id="ev-nome" value="${esc(ev.nome || '')}"
                placeholder="São João Irecê 2027" ${podeEditar ? '' : 'disabled'} required>
       </div>
 
       <div class="campo">
-        <label>Logo do evento</label>
+        <label>Logo do contrato</label>
         <div class="envio-logo">
           <img class="previa" id="ev-previa" alt=""
                src="${esc(ev.logo_url || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22/%3E')}">
@@ -229,7 +229,7 @@ async function modalEvento(id, aoSalvar) {
         <div class="modal-acoes">
           <button type="button" class="botao" id="ev-cancelar">Cancelar</button>
           <button type="submit" class="botao botao-primario" id="ev-salvar">
-            ${edicao ? 'Salvar' : 'Criar evento'}
+            ${edicao ? 'Salvar' : 'Criar contrato'}
           </button>
         </div>` : `
         <div class="modal-acoes">
@@ -259,7 +259,7 @@ async function modalEvento(id, aoSalvar) {
     if (!podeEditar) return;
 
     const nome = q('#ev-nome').value.trim();
-    if (!nome) return aviso('Informe o nome do evento.', 'aviso');
+    if (!nome) return aviso('Informe o nome do contrato.', 'aviso');
 
     const inicio = q('#ev-inicio').value || null;
     const fim = q('#ev-fim').value || null;
@@ -284,7 +284,7 @@ async function modalEvento(id, aoSalvar) {
         if (edicao) {
           dados.situacao = q('#ev-situacao').value;
           await atualizarEvento(id, dados);
-          aviso('Evento atualizado.');
+          aviso('Contrato atualizado.');
         } else {
           dados.empresa_id = q('#ev-empresa')?.value || empresas[0].id;
           dados.dono_id = sessao.usuario.id;
@@ -293,9 +293,9 @@ async function modalEvento(id, aoSalvar) {
           const marcadas = [...document.querySelectorAll('.ev-fonte:checked')].map(c => c.value);
           if (marcadas.length) {
             try { await criarFontes(novo.id, marcadas); }
-            catch (err) { aviso('Evento criado, mas as fontes falharam: ' + err.message, 'aviso'); }
+            catch (err) { aviso('Contrato criado, mas as fontes falharam: ' + err.message, 'aviso'); }
           }
-          aviso('Evento criado.');
+          aviso('Contrato criado.');
         }
 
         fecharModal();

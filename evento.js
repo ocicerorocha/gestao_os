@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════
-// Dentro de um evento — cabeçalho, abas e painel
+// Dentro de um contrato — cabeçalho, abas e painel
 // ═══════════════════════════════════════════════════════
 
 import { buscarEvento, listarItens, minhaPermissao, andamentoItens, listarReceitas, encerrarEvento, apagarEvento } from './nucleo.js';
@@ -8,14 +8,14 @@ import { abaProducao } from './producao.js';
 import { abaSolicitacoes, abaAprovacoes } from './solicitacoes.js';
 import { abaReceitas } from './receitas.js';
 
-export const contexto = { evento: null, permissao: null, itens: [], aba: 'painel' };
+export const contexto = { contrato: null, permissao: null, itens: [], aba: 'painel' };
 
 const ABAS = [
   { id: 'painel',       rotulo: 'Painel' },
   { id: 'producao',     rotulo: 'Produção' },
   { id: 'solicitacoes', rotulo: 'Solicitações' },
   { id: 'aprovacoes',   rotulo: 'Aprovações', perm: 'aprovar_pagamento' },
-  { id: 'receitas',     rotulo: 'Receitas',   perm: 'ver_receitas' },
+  { id: 'receitas',     rotulo: 'Repasses',   perm: 'ver_receitas' },
   { id: 'bilheteria',   rotulo: 'Bilheteria', embreve: true },
 ];
 
@@ -26,7 +26,7 @@ function abasVisiveis() {
 
 export async function telaEvento(eventoId, aba = 'painel') {
   const alvo = document.querySelector('#conteudo');
-  alvo.innerHTML = `<div style="padding:40px;text-align:center;color:var(--texto-2)">Abrindo evento...</div>`;
+  alvo.innerHTML = `<div style="padding:40px;text-align:center;color:var(--texto-2)">Abrindo contrato...</div>`;
 
   try {
     const [ev, perm] = await Promise.all([buscarEvento(eventoId), minhaPermissao(eventoId)]);
@@ -53,13 +53,13 @@ function desenhar() {
   const ev = contexto.evento;
   const sit = SITUACAO_EVENTO[ev.situacao] || SITUACAO_EVENTO.planejamento;
   const alvo = document.querySelector('#conteudo');
-  registrarView(desenhar);   // o olhinho repinta o evento sem sair dele
+  registrarView(desenhar);   // o olhinho repinta o contrato sem sair dele
 
   alvo.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
-      <button class="botao voltar" id="voltar">← Eventos</button>
+      <button class="botao voltar" id="voltar">← Contratos</button>
       ${(contexto.permissao?.admin && ev.situacao !== 'encerrado')
-        ? `<button class="botao botao-perigo" id="ev-excluir" style="height:32px;font-size:13px">Excluir evento</button>` : ''}
+        ? `<button class="botao botao-perigo" id="ev-excluir" style="height:32px;font-size:13px">Excluir contrato</button>` : ''}
     </div>
 
     <div class="evento-cabeca">
@@ -95,14 +95,14 @@ function desenhar() {
   if (btnExcluir) btnExcluir.addEventListener('click', async () => {
     const n = (contexto.itens || []).length;
     if (n > 0) {
-      const r = prompt(`Este evento tem ${n} item(ns). Excluir APAGA o evento e TODOS os seus dados (itens, solicitações, pagamentos, receitas). Ação irreversível.\n\nDigite EXCLUIR para confirmar:`);
+      const r = prompt(`Este contrato tem ${n} item(ns). Excluir APAGA o contrato e TODOS os seus dados (itens, solicitações, pagamentos, repasses). Ação irreversível.\n\nDigite EXCLUIR para confirmar:`);
       if (r !== 'EXCLUIR') return;
     } else {
-      if (!confirm('Excluir este evento? Esta ação é irreversível.')) return;
+      if (!confirm('Excluir este contrato? Esta ação é irreversível.')) return;
     }
     try {
       await apagarEvento(ev.id);
-      aviso('Evento excluído.');
+      aviso('Contrato excluído.');
       document.dispatchEvent(new CustomEvent('voltar-eventos'));
     } catch (e) { aviso(e.message, 'erro'); }
   });
@@ -118,7 +118,7 @@ function desenhar() {
   else                                       abaPainel(corpo);
 }
 
-/* ── painel do evento ──────────────────────────────── */
+/* ── painel do contrato ──────────────────────────────── */
 
 function pontinho(cor) {
   return `<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${cor};margin-right:5px;vertical-align:middle"></span>`;
@@ -133,7 +133,7 @@ async function abaPainel(alvo) {
     alvo.innerHTML = `
       <div class="vazio">
         <h3>Orçamento vazio</h3>
-        <p>Comece cadastrando os itens na aba Produção, ou importe a planilha do evento anterior.</p>
+        <p>Comece cadastrando os itens na aba Produção, ou importe a planilha do contrato anterior.</p>
         <button class="botao botao-primario" id="ir-producao">Ir para Produção</button>
       </div>`;
     alvo.querySelector('#ir-producao')?.addEventListener('click', () => {
@@ -150,11 +150,11 @@ async function abaPainel(alvo) {
     (await andamentoItens(ev.id)).forEach(a => { andamento[a.item_id] = a; });
   } catch (e) { /* segue sem o financeiro; o orçamento ainda aparece */ }
 
-  // receitas — só para quem pode ver (dado sensível)
+  // repasses — só para quem pode ver (dado sensível)
   const podeVerReceitas = contexto.permissao?.admin || contexto.permissao?.ver_receitas;
-  let receitas = [];
+  let repasses = [];
   if (podeVerReceitas) {
-    try { receitas = await listarReceitas(ev.id); } catch (e) { receitas = []; }
+    try { repasses = await listarReceitas(ev.id); } catch (e) { repasses = []; }
   }
 
   // ── números ──
@@ -182,7 +182,7 @@ async function abaPainel(alvo) {
   });
   const cats = Object.entries(porCategoria).sort((a, b) => b[1].orcado - a[1].orcado);
 
-  // receitas: totais, resultado e por fonte
+  // repasses: totais, resultado e por fonte
   const receitaPrevista = receitas.reduce((a, r) => a + Number(r.valor_previsto || 0), 0);
   const recebido = receitas.reduce((a, r) => a + Number(r.recebido || 0), 0);
   const resultadoPrevisto = receitaPrevista - orcado;
@@ -224,9 +224,9 @@ async function abaPainel(alvo) {
 
   alvo.innerHTML = `
     <div style="display:flex;justify-content:${podeEncerrar ? 'space-between' : 'flex-end'};align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
-      ${podeEncerrar ? `<span class="etiqueta etiqueta-verde">Evento quitado — pronto para encerrar</span>` : ''}
+      ${podeEncerrar ? `<span class="etiqueta etiqueta-verde">Contrato quitado — pronto para encerrar</span>` : ''}
       <div style="display:flex;gap:8px">
-        ${podeEncerrar ? `<button class="botao botao-primario" id="ev-encerrar" style="height:32px;font-size:13px">Encerrar evento</button>` : ''}
+        ${podeEncerrar ? `<button class="botao botao-primario" id="ev-encerrar" style="height:32px;font-size:13px">Encerrar contrato</button>` : ''}
         <button class="botao" id="ev-pdf" style="height:32px;font-size:13px">Exportar PDF</button>
       </div>
     </div>
@@ -256,7 +256,7 @@ async function abaPainel(alvo) {
           <div><div class="rotulo">Previsto</div><div style="font-weight:700;font-size:18px;color:${resultadoPrevisto >= 0 ? 'var(--verde)' : 'var(--vermelho)'}">${resultadoPrevisto >= 0 ? '+' : ''}${moeda(resultadoPrevisto)}</div></div>
           <div style="text-align:right"><div class="rotulo">Fluxo real</div><div style="font-weight:700;font-size:18px;color:${resultadoReal >= 0 ? 'var(--verde)' : 'var(--vermelho)'}">${resultadoReal >= 0 ? '+' : ''}${moeda(resultadoReal)}</div></div>
         </div>
-        <div class="rotulo" style="margin-top:6px">previsto = receita − orçado · real = recebido − pago</div>
+        <div class="rotulo" style="margin-top:6px">previsto = repasse − orçado · real = recebido − pago</div>
       </div>` : ''}
     </div>
 
@@ -278,7 +278,7 @@ async function abaPainel(alvo) {
         <div class="rotulo" style="margin-top:2px">${numero(itens.length)} ${itens.length === 1 ? 'item' : 'itens'}</div>
       </div>
       <div class="metrica">
-        <div class="rotulo">Evento anterior</div>
+        <div class="rotulo">Contrato anterior</div>
         <div class="valor" style="color:var(--texto-2)">${moeda(referencia)}</div>
         <div class="rotulo" style="margin-top:2px">referência de custo</div>
       </div>
@@ -360,7 +360,7 @@ async function abaPainel(alvo) {
     </div>
 
     ${podeVerReceitas ? (receitas.length ? `
-      <h2 style="font-size:15px;margin:24px 0 10px">Receitas por fonte</h2>
+      <h2 style="font-size:15px;margin:24px 0 10px">Repasses por fonte</h2>
       <div class="cartao">
         ${fontes.map(([nome, v]) => {
           const p = v.previsto > 0 ? Math.round(v.recebido / v.previsto * 100) : 0;
@@ -380,19 +380,19 @@ async function abaPainel(alvo) {
           <span>${pontinho('var(--borda-forte)')}previsto</span>
         </div>
       </div>` : `
-      <h2 style="font-size:15px;margin:24px 0 10px">Receitas por fonte</h2>
-      <div class="cartao" style="color:var(--texto-2);font-size:14px">Nenhuma receita cadastrada ainda.</div>`) : ''}
+      <h2 style="font-size:15px;margin:24px 0 10px">Repasses por fonte</h2>
+      <div class="cartao" style="color:var(--texto-2);font-size:14px">Nenhum repasse cadastrado ainda.</div>`) : ''}
   `;
 
   alvo.querySelectorAll('[data-ir-producao]').forEach(el =>
     el.addEventListener('click', () => { contexto.aba = 'producao'; desenhar(); }));
   alvo.querySelector('#ev-pdf')?.addEventListener('click', () => window.print());
   alvo.querySelector('#ev-encerrar')?.addEventListener('click', async () => {
-    if (!confirm('Encerrar este evento? Isso trava novos lançamentos (itens, solicitações, receitas). Dá pra reabrir depois mudando a situação no cadastro do evento.')) return;
+    if (!confirm('Encerrar este contrato? Isso trava novos lançamentos (itens, solicitações, repasses). Dá pra reabrir depois mudando a situação no cadastro do contrato.')) return;
     try {
       await encerrarEvento(ev.id);
       contexto.evento.situacao = 'encerrado';
-      aviso('Evento encerrado.');
+      aviso('Contrato encerrado.');
       desenhar();
     } catch (e) { aviso(e.message, 'erro'); }
   });

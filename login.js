@@ -27,7 +27,7 @@ export function telaLogin(aoEntrar, modo = 'entrar') {
             <div class="campo">
               <label for="email">Email</label>
               <input class="controle" type="email" id="email" autocomplete="email"
-                     placeholder="voce@produtora.com.br" required>
+                     placeholder="voce@organizacao.org.br" required>
             </div>
             <div class="campo">
               <label for="senha">Senha</label>

@@ -6,7 +6,7 @@
 // onde vier.
 //
 // Sem projeção de cobertura e sem separação por fonte — a fonte
-// só se sabe na hora de pagar, e a receita entra de forma
+// só se sabe na hora de pagar, e o repasse entra de forma
 // imprevisível. O que ajuda a decidir é o ACUMULADO: quanto terá
 // saído do caixa se você pagar tudo até ali.
 // ═══════════════════════════════════════════════════════
@@ -41,7 +41,7 @@ export async function telaPagamentos() {
   const alvo = document.querySelector('#conteudo');
   const emp = empresaAtual();
   if (!emp) {
-    alvo.innerHTML = `<div class="vazio"><h3>Sem produtora</h3><p>Você não está vinculado a nenhuma produtora.</p></div>`;
+    alvo.innerHTML = `<div class="vazio"><h3>Sem organização</h3><p>Você não está vinculado a nenhuma organização.</p></div>`;
     return;
   }
 
@@ -66,7 +66,7 @@ function desenhar(alvo) {
   if (_filtroEvento) linhas = linhas.filter(l => l.evento_id === _filtroEvento);
   if (_soUrgentes)   linhas = linhas.filter(l => l.urgente);
 
-  const eventos = [...new Map(_linhas.map(l => [l.evento_id, l.evento_nome])).entries()];
+  const contratos = [...new Map(_linhas.map(l => [l.evento_id, l.evento_nome])).entries()];
   const h = hoje();
 
   const vencidas = linhas.filter(l => l.vencimento && l.vencimento < h);
@@ -115,7 +115,7 @@ function desenhar(alvo) {
 
     <div class="barra-filtros">
       <select class="controle" id="a-evento" style="width:auto;min-width:200px">
-        <option value="">Todos os eventos</option>
+        <option value="">Todos os contratos</option>
         ${eventos.map(([id, nome]) => `<option value="${esc(id)}" ${_filtroEvento === id ? 'selected' : ''}>${esc(nome)}</option>`).join('')}
       </select>
       <button class="botao ${_soUrgentes ? 'botao-primario' : ''}" id="a-urgentes">
@@ -244,7 +244,7 @@ function nomeDoDia(iso) {
 function renderPagos(alvo) {
   let pagos = _pagos;
   if (_filtroEvento) pagos = pagos.filter(p => p.evento_id === _filtroEvento);
-  const eventos = [...new Map(_pagos.map(p => [p.evento_id, p.evento_nome])).entries()];
+  const contratos = [...new Map(_pagos.map(p => [p.evento_id, p.evento_nome])).entries()];
   const total = pagos.reduce((a, p) => a + Number(p.valor || 0), 0);
 
   alvo.innerHTML = `
@@ -261,7 +261,7 @@ function renderPagos(alvo) {
 
     <div class="barra-filtros">
       <select class="controle" id="pg-evento" style="width:auto;min-width:200px">
-        <option value="">Todos os eventos</option>
+        <option value="">Todos os contratos</option>
         ${eventos.map(([id, nome]) => `<option value="${esc(id)}" ${_filtroEvento === id ? 'selected' : ''}>${esc(nome)}</option>`).join('')}
       </select>
     </div>

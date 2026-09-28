@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════
-// Receitas — o dinheiro que entra
+// Repasses — o dinheiro que entra
 //
-// Espelha as Solicitações: fonte → receita → parcela → recebimento.
+// Espelha as Solicitações: fonte → repasse → parcela → recebimento.
 // Recebido é a soma dos recebimentos; estorno é registro negativo.
 // ═══════════════════════════════════════════════════════
 
@@ -29,7 +29,7 @@ let _filtro = '';
 export async function abaReceitas(alvo) {
   const p = contexto.permissao || {};
   if (!p.admin && !p.ver_receitas) {
-    alvo.innerHTML = `<div class="vazio"><h3>Sem acesso</h3><p>Você não tem permissão para ver as receitas deste evento.</p></div>`;
+    alvo.innerHTML = `<div class="vazio"><h3>Sem acesso</h3><p>Você não tem permissão para ver os repasses deste contrato.</p></div>`;
     return;
   }
 
@@ -81,7 +81,7 @@ function desenhar(alvo) {
       </select>
       <div style="flex:1"></div>
       ${podeLancar ? `<button class="botao" id="r-fontes">Gerir fontes</button>` : ''}
-      ${podeLancar && aberto ? `<button class="botao botao-primario" id="r-nova">Nova receita</button>` : ''}
+      ${podeLancar && aberto ? `<button class="botao botao-primario" id="r-nova">Novo repasse</button>` : ''}
     </div>
 
     ${lista.length ? `
@@ -90,7 +90,7 @@ function desenhar(alvo) {
           <thead>
             <tr>
               <th style="width:150px">Fonte</th>
-              <th>Receita</th>
+              <th>Repasse</th>
               <th style="width:130px" class="num">Previsto</th>
               <th style="width:130px" class="num">Recebido</th>
               <th style="width:150px">Situação</th>
@@ -108,9 +108,9 @@ function desenhar(alvo) {
         </table>
       </div>` : `
       <div class="vazio">
-        <h3>${_filtro ? 'Nada nesta situação' : 'Nenhuma receita ainda'}</h3>
-        <p>${_filtro ? 'Escolha outra situação.' : 'Cadastre a receita prevista do evento por fonte — bilheteria, patrocínio, camarotes, bar.'}</p>
-        ${podeLancar && aberto && !_filtro ? `<button class="botao botao-primario" id="r-nova2">Nova receita</button>` : ''}
+        <h3>${_filtro ? 'Nada nesta situação' : 'Nenhum repasse ainda'}</h3>
+        <p>${_filtro ? 'Escolha outra situação.' : 'Cadastre o repasse previsto do contrato, por fonte.'}</p>
+        ${podeLancar && aberto && !_filtro ? `<button class="botao botao-primario" id="r-nova2">Novo repasse</button>` : ''}
       </div>`}
   `;
 
@@ -139,15 +139,15 @@ function linha(r) {
     </tr>`;
 }
 
-/* ── nova receita ──────────────────────────────────── */
+/* ── novo repasse ──────────────────────────────────── */
 
 function modalNova(alvo) {
   const ativas = _fontes.filter(f => f.ativa);
   if (!ativas.length) {
-    abrirModal('Nova receita', `
+    abrirModal('Novo repasse', `
       <div class="vazio" style="border:none;padding:20px 0">
         <h3>Nenhuma fonte cadastrada</h3>
-        <p>Cadastre ao menos uma fonte de receita antes (bilheteria, patrocínio…).</p>
+        <p>Cadastre ao menos uma fonte de repasse antes (bilheteria, patrocínio…).</p>
       </div>
       <div class="modal-acoes">
         <button class="botao" id="rn-fechar">Fechar</button>
@@ -158,7 +158,7 @@ function modalNova(alvo) {
     return;
   }
 
-  abrirModal('Nova receita', `
+  abrirModal('Novo repasse', `
     <form id="fr">
       <div class="linha linha-2">
         <div class="campo">
@@ -198,7 +198,7 @@ function modalNova(alvo) {
 
       <div class="modal-acoes">
         <button type="button" class="botao" id="r-cancelar">Cancelar</button>
-        <button type="submit" class="botao botao-primario" id="r-salvar">Cadastrar receita</button>
+        <button type="submit" class="botao botao-primario" id="r-salvar">Cadastrar repasse</button>
       </div>
     </form>
   `);
@@ -272,7 +272,7 @@ function modalNova(alvo) {
           pagador: q('#r-pagador').value,
           observacoes: q('#r-obs').value,
         }, validas);
-        aviso('Receita cadastrada.');
+        aviso('Repasse cadastrado.');
         fecharModal();
         await abaReceitas(alvo);
       } catch (err) { aviso(err.message, 'erro'); }
@@ -280,7 +280,7 @@ function modalNova(alvo) {
   });
 }
 
-/* ── detalhe da receita ────────────────────────────── */
+/* ── detalhe do repasse ────────────────────────────── */
 
 function modalDetalhe(id, alvo) {
   const r = _receitas.find(x => x.id === id);
@@ -291,7 +291,7 @@ function modalDetalhe(id, alvo) {
   const podeLancar = p.admin || p.lancar_receitas;
   const aberto = contexto.evento.situacao !== 'encerrado';
 
-  abrirModal(`Receita · ${esc(r.fonte_nome || 'sem fonte')}`, `
+  abrirModal(`Repasse · ${esc(r.fonte_nome || 'sem fonte')}`, `
     <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap">
       <div style="flex:1;min-width:180px">
         <div style="font-size:16px;font-weight:600">${esc(r.descricao || '—')}</div>
@@ -351,7 +351,7 @@ function modalDetalhe(id, alvo) {
 
     <div class="modal-acoes">
       ${podeLancar && aberto && Number(r.recebido) <= 0.005
-        ? `<button type="button" class="botao botao-perigo" id="rd-apagar" style="margin-right:auto">Apagar receita</button>` : ''}
+        ? `<button type="button" class="botao botao-perigo" id="rd-apagar" style="margin-right:auto">Apagar repasse</button>` : ''}
       <button type="button" class="botao" id="rd-fechar">Fechar</button>
     </div>
   `);
@@ -366,10 +366,10 @@ function modalDetalhe(id, alvo) {
 
   document.getElementById('rd-fechar').addEventListener('click', fecharModal);
   document.getElementById('rd-apagar')?.addEventListener('click', async () => {
-    if (!confirm('Apagar esta receita? Fica registrado na auditoria.')) return;
+    if (!confirm('Apagar este repasse? Fica registrado na auditoria.')) return;
     try {
       await apagarReceita(id);
-      aviso('Receita apagada.');
+      aviso('Repasse apagada.');
       fecharModal();
       await abaReceitas(alvo);
     } catch (e) { aviso(e.message, 'erro'); }
@@ -481,7 +481,7 @@ async function modalFontes(alvo) {
   };
   const q = s => document.querySelector(s);
 
-  // eventos anteriores da mesma empresa, para copiar fontes
+  // contratos anteriores da mesma empresa, para copiar fontes
   let outros = [];
   try {
     const emp = empresaAtual();
@@ -489,7 +489,7 @@ async function modalFontes(alvo) {
       .filter(e => e.empresa?.id === emp?.id && e.id !== eventoId);
   } catch (e) { /* segue sem a opção de copiar */ }
 
-  abrirModal('Fontes de receita', `
+  abrirModal('Fontes de repasse', `
     <div id="mf-lista" style="margin-bottom:14px"></div>
 
     <form id="mf-nova" style="display:flex;gap:8px;margin-bottom:12px">
@@ -499,10 +499,10 @@ async function modalFontes(alvo) {
 
     ${outros.length ? `
       <div class="cartao" style="background:var(--superficie-2);border:none;padding:12px">
-        <div class="rotulo" style="margin-bottom:6px">Copiar fontes de outro evento</div>
+        <div class="rotulo" style="margin-bottom:6px">Copiar fontes de outro contrato</div>
         <div style="display:flex;gap:8px">
           <select class="controle" id="mf-copiar-ev" style="flex:1">
-            <option value="">— escolher evento —</option>
+            <option value="">— escolher contrato —</option>
             ${outros.map(e => `<option value="${esc(e.id)}">${esc(e.nome)}</option>`).join('')}
           </select>
           <button type="button" class="botao" id="mf-copiar">Copiar</button>
@@ -526,11 +526,11 @@ async function modalFontes(alvo) {
   });
   q('#mf-copiar')?.addEventListener('click', async () => {
     const evId = q('#mf-copiar-ev').value;
-    if (!evId) return aviso('Escolha um evento.', 'aviso');
+    if (!evId) return aviso('Escolha um contrato.', 'aviso');
     try {
       const fontes = await listarFontesReceita(evId);
       const nomes = fontes.filter(f => f.ativa).map(f => f.nome);
-      if (!nomes.length) return aviso('Aquele evento não tem fontes ativas.', 'aviso');
+      if (!nomes.length) return aviso('Aquele contrato não tem fontes ativas.', 'aviso');
       await copiarFontesReceita(eventoId, nomes);
       aviso(`${nomes.length} fonte(s) copiada(s).`);
       await render();

@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════
-// Produtora — dados da empresa em que se está operando
+// Organização — dados da empresa em que se está operando
 // ═══════════════════════════════════════════════════════
 
 import {
@@ -12,21 +12,21 @@ export async function telaProdutora() {
   const alvo = document.querySelector('#conteudo');
   const emp = empresaAtual();
   if (!emp) {
-    alvo.innerHTML = `<div class="vazio"><h3>Sem produtora</h3><p>Você não está vinculado a nenhuma produtora.</p></div>`;
+    alvo.innerHTML = `<div class="vazio"><h3>Sem organização</h3><p>Você não está vinculado a nenhuma organização.</p></div>`;
     return;
   }
 
   const podeEditar = souAdmin(emp.id);
-  let eventos = [], fornecedores = [];
+  let contratos = [], fornecedores = [];
   try {
-    [eventos, fornecedores] = await Promise.all([listarEventos(), listarFornecedores(emp.id)]);
+    [contratos, fornecedores] = await Promise.all([listarEventos(), listarFornecedores(emp.id)]);
   } catch (e) { /* números são complemento; a tela funciona sem eles */ }
 
   const meu = sessao.membros.find(m => m.empresa?.id === emp.id);
   const PAPEL = { mestre: 'Mestre', administrador: 'Administrador', membro: 'Membro' };
 
   alvo.innerHTML = `
-    <div class="pagina-topo"><h1>Produtora</h1></div>
+    <div class="pagina-topo"><h1>Organização</h1></div>
 
     <div class="cartao" style="margin-bottom:16px">
       <div class="envio-logo" style="margin-bottom:18px">
@@ -66,13 +66,13 @@ export async function telaProdutora() {
           </div>
         </form>` : `
         <p style="font-size:13px;color:var(--texto-2)">
-          Apenas administradores da produtora editam estes dados.
+          Apenas administradores da organização editam estes dados.
         </p>`}
     </div>
 
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">
       <div class="metrica">
-        <div class="rotulo">Eventos</div>
+        <div class="rotulo">Contratos</div>
         <div class="valor">${numero(eventos.length)}</div>
       </div>
       <div class="metrica">
@@ -86,7 +86,7 @@ export async function telaProdutora() {
     </div>
 
     ${sessao.membros.length > 1 ? `
-      <h2 style="font-size:15px;margin:24px 0 10px">Outras produtoras em que você atua</h2>
+      <h2 style="font-size:15px;margin:24px 0 10px">Outras organizações em que você atua</h2>
       <div class="cartao" style="padding:0;overflow:hidden">
         ${sessao.membros.slice(1).map(m => `
           <div class="linha-lista">
@@ -97,7 +97,7 @@ export async function telaProdutora() {
           </div>`).join('')}
       </div>
       <p style="font-size:12px;color:var(--texto-3);margin-top:8px">
-        Cada produtora tem seus dados isolados. Nada é somado entre elas.
+        Cada organização tem seus dados isolados. Nada é somado entre elas.
       </p>` : ''}
   `;
 
@@ -122,14 +122,14 @@ export async function telaProdutora() {
   q('#fe').addEventListener('submit', async e => {
     e.preventDefault();
     const nome = q('#e-nome').value.trim();
-    if (!nome) return aviso('Informe o nome da produtora.', 'aviso');
+    if (!nome) return aviso('Informe o nome da organização.', 'aviso');
 
     await comBotao(q('#e-salvar'), async () => {
       try {
         const dados = { nome, cnpj: q('#e-cnpj').value };
         if (arquivo) dados.logo_url = await enviarLogo(arquivo, 'empresa');
         await salvarEmpresa(emp.id, dados);
-        aviso('Dados da produtora atualizados.');
+        aviso('Dados da organização atualizados.');
         document.dispatchEvent(new CustomEvent('produtora-alterada'));
         await telaProdutora();
       } catch (err) { aviso(err.message, 'erro'); }

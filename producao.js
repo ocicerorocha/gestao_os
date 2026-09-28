@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════
-// Produção — os itens orçados do evento
+// Produção — os itens orçados do contrato
 //
 // A tabela mostra só o essencial: item, categoria, custo do
-// evento anterior e valor orçado. Quantidade e diária existem
+// contrato anterior e valor orçado. Quantidade e diária existem
 // como calculadora recolhida no cadastro, para os casos em que
 // a conta importa — cachê de equipe, rádios, hospedagem.
 // ═══════════════════════════════════════════════════════
@@ -149,7 +149,7 @@ function desenhar(alvo) {
         <div><span style="font-size:12px;color:var(--texto-3)">Ano anterior </span><strong class="num" style="color:var(--texto-2)">${moeda(totalRef)}</strong></div>
       </div>` : ''}
 
-    ${!aberto ? `<p class="dica" style="margin-bottom:12px">Evento encerrado — os lançamentos estão travados.</p>` : ''}
+    ${!aberto ? `<p class="dica" style="margin-bottom:12px">Contrato encerrado — os lançamentos estão travados.</p>` : ''}
 
     ${itens.length ? `
       <div class="tabela-rolagem">
@@ -177,7 +177,7 @@ function desenhar(alvo) {
         <h3>${temFiltro ? 'Nada encontrado' : 'Nenhum item ainda'}</h3>
         <p>${temFiltro
               ? 'Ajuste os filtros para ver outros itens.'
-              : 'Cadastre item a item, ou importe a planilha do evento anterior para começar com a base de custos pronta.'}</p>
+              : 'Cadastre item a item, ou importe a planilha do contrato anterior para começar com a base de custos pronta.'}</p>
         ${podeEditar && aberto && !temFiltro ? `
           <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
             <button class="botao botao-primario" id="p-novo2">Novo item</button>
@@ -348,7 +348,7 @@ function modalItem(item) {
                  value="${i.valor_orcado ?? ''}" placeholder="0,00" required>
         </div>
         <div class="campo">
-          <label for="i-ref">Custo do evento anterior</label>
+          <label for="i-ref">Custo do contrato anterior</label>
           <input class="controle" id="i-ref" data-moeda
                  value="${i.custo_referencia ?? ''}" placeholder="opcional"
                  ${podeAdmin ? '' : 'readonly style="opacity:.6;cursor:not-allowed"'}>

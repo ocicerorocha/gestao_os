@@ -151,7 +151,7 @@ function linha(s) {
 function desenharFila(alvo) {
   const p = contexto.permissao || {};
   if (!p.admin && !p.aprovar_pagamento) {
-    alvo.innerHTML = `<div class="vazio"><h3>Sem acesso</h3><p>Você não tem permissão para aprovar pagamentos neste evento.</p></div>`;
+    alvo.innerHTML = `<div class="vazio"><h3>Sem acesso</h3><p>Você não tem permissão para aprovar pagamentos neste contrato.</p></div>`;
     return;
   }
 
@@ -205,7 +205,7 @@ function desenharFila(alvo) {
       </div>` : `
       <div class="vazio">
         <h3>Nada aguardando</h3>
-        <p>Nenhuma solicitação pendente de aprovação neste evento.</p>
+        <p>Nenhuma solicitação pendente de aprovação neste contrato.</p>
       </div>`}
   `;
 

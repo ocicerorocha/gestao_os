@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Backstage — diagnóstico</title>
+<title>Facility — diagnóstico</title>
 <link rel="stylesheet" href="estilo.css">
 <style>
   .teste { display:flex; gap:12px; align-items:flex-start; padding:12px 0; border-bottom:1px solid var(--borda); }
@@ -110,7 +110,7 @@ for (let i = 0; i < testes.length; i++) {
 
 document.getElementById('copiar').addEventListener('click', e => {
   navigator.clipboard?.writeText(
-    'Backstage — diagnóstico\n' + navigator.userAgent + '\n\n' + resultados.join('\n')
+    'Facility — diagnóstico\n' + navigator.userAgent + '\n\n' + resultados.join('\n')
   );
   e.target.textContent = 'Copiado';
 });

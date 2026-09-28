@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════
-// Contas — saldo por conta + fluxo de caixa (nível produtora)
+// Contas — saldo por conta + fluxo de caixa (nível organização)
 //
 // Conta é só um NOME. Ao pagar marca "de onde saiu", ao receber
 // "onde entrou". A aba mostra o saldo de cada conta e o extrato
@@ -18,7 +18,7 @@ let _fTipo = '';    // '' = tudo | 'entrada' | 'saida'
 export async function telaContas() {
   const alvo = document.querySelector('#conteudo');
   _emp = empresaAtual();
-  if (!_emp) { alvo.innerHTML = `<div class="vazio"><h3>Sem produtora</h3></div>`; return; }
+  if (!_emp) { alvo.innerHTML = `<div class="vazio"><h3>Sem organização</h3></div>`; return; }
 
   alvo.innerHTML = `<div style="padding:40px;text-align:center;color:var(--texto-2)">Carregando contas...</div>`;
   try {

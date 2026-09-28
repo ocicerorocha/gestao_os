@@ -11,15 +11,15 @@ import {
 } from './nucleo.js';
 import { esc, aviso, abrirModal, fecharModal, comBotao, moeda, dataBR } from './ui.js';
 
-/* Permissões de evento, na ordem em que aparecem */
+/* Permissões de contrato, na ordem em que aparecem */
 export const PERMISSOES_EVENTO = [
-  ['ver_evento',          'Ver evento',           'Painel, produção, solicitações e histórico'],
+  ['ver_evento',          'Ver contrato',           'Painel, produção, solicitações e histórico'],
   ['editar_producao',     'Editar produção',      'Criar e alterar itens orçados'],
   ['criar_solicitacao',   'Criar solicitação',    'Pedir pagamento de um item'],
   ['aprovar_pagamento',   'Aprovar pagamento',    'Autorizar a solicitação'],
   ['confirmar_pagamento', 'Confirmar pagamento',  'Registrar que o dinheiro saiu'],
-  ['ver_receitas',        'Ver receitas',         'Acompanhar as entradas'],
-  ['lancar_receitas',     'Lançar receitas',      'Registrar entradas'],
+  ['ver_receitas',        'Ver repasses',         'Acompanhar as entradas'],
+  ['lancar_receitas',     'Lançar repasses',      'Registrar entradas'],
   ['exportar',            'Exportar relatórios',  'Gerar planilha e PDF'],
 ];
 
@@ -35,9 +35,9 @@ export const PAPEIS_EVENTO = {
 
 const PERMISSOES_EMPRESA = [
   ['ver_painel',         'Painel da empresa',      'Resultado consolidado e total a pagar'],
-  ['criar_eventos',      'Criar eventos',          'Abrir novo evento'],
+  ['criar_eventos',      'Criar contratos',          'Abrir novo contrato'],
   ['gerir_fornecedores', 'Fornecedores',           'Cadastro e meios de pagamento'],
-  ['gerir_custos_adm',   'Custos administrativos', 'Despesas fora de evento'],
+  ['gerir_custos_adm',   'Custos administrativos', 'Despesas fora de contrato'],
   ['gerir_usuarios',     'Gerir usuários',         'Convidar pessoas e definir permissões'],
 ];
 
@@ -50,7 +50,7 @@ export async function telaUsuarios() {
   const alvo = document.querySelector('#conteudo');
   _empresa = empresaAtual();
   if (!_empresa) {
-    alvo.innerHTML = `<div class="vazio"><h3>Sem produtora</h3><p>Você não está vinculado a nenhuma produtora.</p></div>`;
+    alvo.innerHTML = `<div class="vazio"><h3>Sem organização</h3><p>Você não está vinculado a nenhuma organização.</p></div>`;
     return;
   }
 
@@ -159,15 +159,15 @@ function modalConvite() {
       </div>
 
       <div class="campo">
-        <label for="c-papel">Papel na produtora</label>
+        <label for="c-papel">Papel na organização</label>
         <select class="controle" id="c-papel">
-          <option value="membro">Membro — acessa só os eventos que você liberar</option>
-          <option value="administrador">Administrador — acessa tudo da produtora</option>
+          <option value="membro">Membro — acessa só os contratos que você liberar</option>
+          <option value="administrador">Administrador — acessa tudo da organização</option>
         </select>
       </div>
 
       <div class="campo" id="c-emp-wrap">
-        <label>Permissões na produtora</label>
+        <label>Permissões na organização</label>
         <div style="display:flex;flex-direction:column;gap:8px">
           ${PERMISSOES_EMPRESA.map(([k, r, d]) => `
             <label class="caixa-perm">
@@ -178,7 +178,7 @@ function modalConvite() {
       </div>
 
       <div class="campo">
-        <label>Acesso aos eventos</label>
+        <label>Acesso aos contratos</label>
         ${_eventos.length ? `
           <div style="display:flex;flex-direction:column;gap:8px" id="c-eventos">
             ${_eventos.map(ev => `
@@ -208,7 +208,7 @@ function modalConvite() {
                   </div>
                 </div>
               </div>`).join('')}
-          </div>` : `<div class="dica">Nenhum evento cadastrado ainda.</div>`}
+          </div>` : `<div class="dica">Nenhum contrato cadastrado ainda.</div>`}
       </div>
 
       <div class="modal-acoes">
@@ -221,7 +221,7 @@ function modalConvite() {
   const q = s => document.querySelector(s);
   q('#c-cancelar').addEventListener('click', fecharModal);
 
-  // marcar o evento revela as permissões dele
+  // marcar o contrato revela as permissões dele
   document.querySelectorAll('.c-ev').forEach(cb => {
     cb.addEventListener('change', () => {
       const d = document.querySelector(`.c-ev-detalhe[data-para="${cb.value}"]`);
@@ -295,7 +295,7 @@ async function alternarAtivo(id, ativo) {
   catch (e) { aviso(e.message, 'erro'); }
 }
 
-/* ── permissões por evento de quem já está dentro ──── */
+/* ── permissões por contrato de quem já está dentro ──── */
 
 async function modalPermissoes(usuarioId, nome) {
   const porEvento = {};
@@ -334,7 +334,7 @@ async function modalPermissoes(usuarioId, nome) {
             </div>
           </div>
         </div>`;
-      }).join('') : `<div class="dica">Nenhum evento cadastrado.</div>`}
+      }).join('') : `<div class="dica">Nenhum contrato cadastrado.</div>`}
 
       <div class="modal-acoes">
         <button type="button" class="botao" id="p-cancelar">Cancelar</button>

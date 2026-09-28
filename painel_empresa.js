@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════
-// Painel da empresa — a visão consolidada da produtora
+// Painel da empresa — a visão consolidada da organização
 //
-// Junta os eventos: orçado, pago, receita, recebido, resultado.
-// Linha temporal receita × gastos, comparativo por evento,
+// Junta os contratos: orçado, pago, repasse, recebido, resultado.
+// Linha temporal repasse × gastos, comparativo por contrato,
 // a receber × a pagar. Tudo respeita o olhinho (moeda mascara).
 // ═══════════════════════════════════════════════════════
 
@@ -25,14 +25,14 @@ export async function telaPainelEmpresa() {
   alvo.innerHTML = `<div style="padding:40px;text-align:center;color:var(--texto-2)">Carregando o painel...</div>`;
 
   try {
-    const [eventos, fluxo, fluxoDia, agPagar, agReceber] = await Promise.all([
+    const [contratos, fluxo, fluxoDia, agPagar, agReceber] = await Promise.all([
       resumoEventos(emp.id),
       fluxoMensal(emp.id),
       fluxoDiario(emp.id).catch(() => []),
       listarAgenda(emp.id).catch(() => []),
       listarAgendaReceita(emp.id).catch(() => []),
     ]);
-    _dados = { emp, eventos, fluxo, fluxoDia, agPagar, agReceber };
+    _dados = { emp, contratos, fluxo, fluxoDia, agPagar, agReceber };
   } catch (e) {
     alvo.innerHTML = `<div class="vazio"><h3>Não consegui abrir o painel</h3><p>${esc(e.message)}</p></div>`;
     return;
@@ -50,12 +50,12 @@ function rotuloMes(iso) {
 function desenhar() {
   const alvo = document.querySelector('#conteudo');
   if (!_dados) return;
-  const { eventos, agPagar, agReceber } = _dados;
+  const { contratos, agPagar, agReceber } = _dados;
 
   const cEv = { planejamento:0, em_execucao:0, encerrado:0 };
   eventos.forEach(e => { const s = e.situacao || 'planejamento'; if (cEv[s] != null) cEv[s]++; });
   const hojeD = new Date(); hojeD.setHours(0, 0, 0, 0);
-  const proximos = eventos
+  const proximos = contratos
     .filter(e => e.data_inicio && new Date(e.data_inicio + 'T00:00:00') >= hojeD)
     .sort((a, b) => String(a.data_inicio).localeCompare(String(b.data_inicio)))
     .slice(0, 5);
@@ -97,11 +97,11 @@ function desenhar() {
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">
       <div class="metrica"><div class="rotulo">Orçado</div><div class="valor">${moeda(orcado)}</div></div>
       <div class="metrica"><div class="rotulo">Pago</div><div class="valor" style="color:var(--verde)">${moeda(pago)}</div></div>
-      <div class="metrica"><div class="rotulo">Receita prevista</div><div class="valor">${moeda(receitaPrev)}</div></div>
+      <div class="metrica"><div class="rotulo">Repasse previsto</div><div class="valor">${moeda(receitaPrev)}</div></div>
       <div class="metrica"><div class="rotulo">Recebido</div><div class="valor" style="color:var(--verde)">${moeda(recebido)}</div></div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:10px">
-      <div class="metrica"><div class="rotulo">Resultado previsto (receita − orçado)</div><div class="valor" style="color:${resPrev >= 0 ? 'var(--verde)' : 'var(--vermelho)'}">${resPrev >= 0 ? '+' : ''}${moeda(resPrev)}</div></div>
+      <div class="metrica"><div class="rotulo">Resultado previsto (repasse − orçado)</div><div class="valor" style="color:${resPrev >= 0 ? 'var(--verde)' : 'var(--vermelho)'}">${resPrev >= 0 ? '+' : ''}${moeda(resPrev)}</div></div>
       <div class="metrica"><div class="rotulo">Resultado real (recebido − pago)</div><div class="valor" style="color:${resReal >= 0 ? 'var(--verde)' : 'var(--vermelho)'}">${resReal >= 0 ? '+' : ''}${moeda(resReal)}</div></div>
     </div>
 
@@ -112,26 +112,26 @@ function desenhar() {
     </div>
 
     <div style="display:flex;justify-content:space-between;align-items:center;margin:22px 0 10px;flex-wrap:wrap;gap:8px">
-      <h2 style="font-size:15px;margin:0">Receita × gastos no tempo</h2>
+      <h2 style="font-size:15px;margin:0">Repasse × gastos no tempo</h2>
       <div style="display:flex;gap:6px">
         ${[[30, '30 dias'], [6, '6 meses'], [12, '12 meses'], [999, 'geral']].map(([n, r]) =>
           `<button class="botao" data-per="${n}" style="height:30px;font-size:12px${_periodo === n ? ';border-color:var(--acento);color:var(--acento)' : ''}">${r}</button>`).join('')}
       </div>
     </div>
     <div style="display:flex;gap:16px;font-size:12px;color:var(--texto-2);margin-bottom:6px">
-      <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--verde);margin-right:5px;vertical-align:middle"></span>Receita recebida</span>
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--verde);margin-right:5px;vertical-align:middle"></span>Repasse recebido</span>
       <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#d95926;margin-right:5px;vertical-align:middle"></span>Gastos pagos</span>
     </div>
     ${oculto ? boxOculto(230) : `<div style="position:relative;width:100%;height:230px"><canvas id="pe-linha"></canvas></div>`}
 
-    <h2 style="font-size:15px;margin:22px 0 10px">Resultado por evento</h2>
+    <h2 style="font-size:15px;margin:22px 0 10px">Resultado por contrato</h2>
     <div style="display:flex;gap:16px;font-size:12px;color:var(--texto-2);margin-bottom:6px">
       <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#85b7eb;margin-right:5px;vertical-align:middle"></span>Previsto</span>
       <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--verde);margin-right:5px;vertical-align:middle"></span>Real</span>
     </div>
     ${oculto ? boxOculto(200) : `<div style="position:relative;width:100%;height:200px"><canvas id="pe-barra"></canvas></div>`}
 
-    <h2 style="font-size:15px;margin:22px 0 10px">Próximos eventos</h2>
+    <h2 style="font-size:15px;margin:22px 0 10px">Próximos contratos</h2>
     <div class="cartao" style="padding:0;overflow:hidden;margin-bottom:8px">
       ${proximos.length ? proximos.map(e => {
         const d = new Date(e.data_inicio + 'T00:00:00');
@@ -141,12 +141,12 @@ function desenhar() {
             <div style="font-size:12px;color:var(--texto-2)">${dataBR(e.data_inicio)}${e.cidade ? ' · ' + esc(e.cidade) : ''}</div></div>
           <span class="etiqueta etiqueta-neutra">${faltam === 0 ? 'hoje' : 'em ' + faltam + 'd'}</span>
         </div>`;
-      }).join('') : '<div style="padding:20px;text-align:center;color:var(--texto-2);font-size:14px">Nenhum evento futuro agendado.</div>'}
+      }).join('') : '<div style="padding:20px;text-align:center;color:var(--texto-2);font-size:14px">Nenhum contrato futuro agendado.</div>'}
     </div>
 
-    <h2 style="font-size:15px;margin:22px 0 10px">Por evento</h2>
+    <h2 style="font-size:15px;margin:22px 0 10px">Por contrato</h2>
     <div style="display:flex;flex-direction:column;gap:10px">
-      ${eventos.length ? eventos.map(cartaoEvento).join('') : '<p class="dica">Nenhum evento ainda.</p>'}
+      ${eventos.length ? eventos.map(cartaoEvento).join('') : '<p class="dica">Nenhum contrato ainda.</p>'}
     </div>
   `;
 
@@ -238,7 +238,7 @@ function renderLinha() {
     data: {
       labels,
       datasets: [
-        { label: 'Receita', data: rec, borderColor: '#199e70', backgroundColor: '#199e70', tension: .3, borderWidth: 2, pointRadius: 2 },
+        { label: 'Repasse', data: rec, borderColor: '#199e70', backgroundColor: '#199e70', tension: .3, borderWidth: 2, pointRadius: 2 },
         { label: 'Gastos', data: pag, borderColor: '#d95926', backgroundColor: '#d95926', borderDash: [5, 4], tension: .3, borderWidth: 2, pointRadius: 2 },
       ],
     },

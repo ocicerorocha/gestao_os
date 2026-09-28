@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════
-// Backstage — inicialização e estrutura
+// Facility — inicialização e estrutura
 // ═══════════════════════════════════════════════════════
 
 import { bd, sessao, carregarSessao, sair, salvarPerfil, empresaAtual, membroAtual, definirEmpresaAtiva, termosAceitos, aceitarTermos } from './nucleo.js';
@@ -65,20 +65,20 @@ async function entrarNoSistema() {
 
 const SECOES = [
   { id: 'painel', rotulo: 'Painel', tela: telaPainelEmpresa, perm: 'ver_painel' },
-  { id: 'eventos',      rotulo: 'Eventos',      tela: telaEventos,      sempre: true },
+  { id: 'eventos',      rotulo: 'Contratos',      tela: telaEventos,      sempre: true },
   { id: 'pagamentos',   rotulo: 'Pagamentos',   tela: telaPagamentos,   pagador: true },
   { id: 'contas',       rotulo: 'Contas',       tela: telaContas,       pagador: true },
   { id: 'documentos',   rotulo: 'Documentos',   tela: telaDocumentos,   sempre: true },
   { id: 'fornecedores', rotulo: 'Fornecedores', tela: telaFornecedores, perm: 'gerir_fornecedores' },
   { id: 'usuarios',     rotulo: 'Usuários',     tela: telaUsuarios,     perm: 'gerir_usuarios' },
-  { id: 'produtora',    rotulo: 'Produtora',    tela: telaProdutora,    sempre: true },
+  { id: 'produtora',    rotulo: 'Organização',    tela: telaProdutora,    sempre: true },
 ];
 
 function secoesVisiveis() {
   const m = membroAtual();
   const admin = m && (m.papel === 'mestre' || m.papel === 'administrador');
   // A agenda é de quem paga: administradores, ou quem tem a
-  // permissão de confirmar pagamento em algum evento.
+  // permissão de confirmar pagamento em algum contrato.
   const pagador = admin || sessao.permissoesPagamento === true;
   return SECOES.filter(s =>
     s.sempre || admin || (s.pagador && pagador) || (s.perm && m && m[s.perm]));
@@ -94,7 +94,7 @@ async function montarEstrutura() {
       ${secoes.length > 1 ? `<button class="btn-menu" id="btn-menu" aria-label="Abrir menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>` : ''}
       <span class="marca" style="display:inline-flex;align-items:center;gap:8px"><svg width="20" height="20" viewBox="0 0 64 64" fill="currentColor" aria-hidden="true" style="flex-shrink:0"><rect x="10" y="8" width="12" height="48"/><rect x="31" y="11" width="20" height="14" fill="none" stroke="currentColor" stroke-width="6"/><rect x="28" y="36" width="26" height="20"/></svg>${esc(APP.nome)}</span>
       ${empresa ? `
-        <button class="topo-empresa" id="btn-empresa" ${secoes.length && sessao.membros.length > 1 ? 'title="Trocar de produtora"' : 'disabled'} style="border:none;font-family:inherit;cursor:${sessao.membros.length > 1 ? 'pointer' : 'default'}">
+        <button class="topo-empresa" id="btn-empresa" ${secoes.length && sessao.membros.length > 1 ? 'title="Trocar de organização"' : 'disabled'} style="border:none;font-family:inherit;cursor:${sessao.membros.length > 1 ? 'pointer' : 'default'}">
           ${empresa.logo_url
             ? `<img src="${esc(empresa.logo_url)}" alt="">`
             : `<span class="sigla">${esc(iniciais(empresa.nome))}</span>`}
@@ -168,7 +168,7 @@ function garantirTermos() {
         Um resumo rápido de como o ${esc(APP.nome)} cuida dos seus dados.
       </p>
       <div style="background:var(--superficie-2);border-radius:12px;padding:16px;font-size:13px;line-height:1.55;color:var(--texto-2);margin-bottom:18px">
-        Seus dados e os dos seus eventos são seus e ficam isolados por produtora — uma produtora
+        Seus dados e os dos seus contratos são seus e ficam isolados por organização — uma organização
         nunca enxerga os dados de outra. O ${esc(APP.nome)} guarda e organiza essas informações
         para você e sua equipe, com acesso controlado por permissões. Não vendemos seus dados, e
         você pode solicitar exclusão a qualquer momento.
@@ -306,8 +306,8 @@ function modalPerfil() {
 
 /* ── sessão expirada em outra aba ──────────────────── */
 
-bd.auth.onAuthStateChange((evento) => {
-  if (evento === 'SIGNED_OUT') {
+bd.auth.onAuthStateChange((contrato) => {
+  if (contrato === 'SIGNED_OUT') {
     sessao.usuario = null;
     telaLogin(entrarNoSistema);
   }
@@ -319,7 +319,7 @@ function iconeOlho(oculto) {
   return base + (oculto ? '<line x1="3" y1="3" x2="21" y2="21"/>' : '') + '</svg>';
 }
 
-/* ── trocador de produtora ─────────────────────────── */
+/* ── trocador de organização ─────────────────────────── */
 function alternarMenuEmpresa() {
   const existente = document.querySelector('.menu-empresa');
   if (existente) return existente.remove();
@@ -329,7 +329,7 @@ function alternarMenuEmpresa() {
   menu.style.left = '12px';
   menu.style.right = 'auto';
   menu.innerHTML = `
-    <div class="info"><div class="nome" style="font-size:12px;color:var(--texto-2)">Trocar de produtora</div></div>
+    <div class="info"><div class="nome" style="font-size:12px;color:var(--texto-2)">Trocar de organização</div></div>
     <div class="separador"></div>
     ${sessao.membros.map(m => {
       const e = m.empresa;

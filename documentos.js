@@ -1,10 +1,10 @@
 // ═══════════════════════════════════════════════════════
-// Documentos — todos os anexos da produtora, num lugar só
+// Documentos — todos os anexos da organização, num lugar só
 //
-// Junta os documentos ligados a itens de produção e a receitas
-// de todos os eventos da produtora ativa. Filtros por evento,
+// Junta os documentos ligados a itens de produção e aos repasses
+// de todos os contratos da organização ativa. Filtros por contrato,
 // por categoria e busca por nome (do arquivo, do item ou da
-// receita). Abrir usa link temporário; o depósito é fechado.
+// repasse). Abrir usa link temporário; o depósito é fechado.
 // ═══════════════════════════════════════════════════════
 
 import { empresaAtual, souAdmin, listarDocumentosEmpresa, linkDocumento, apagarDocumento } from './nucleo.js';
@@ -19,7 +19,7 @@ let _busca = '';
 export async function telaDocumentos() {
   const alvo = document.querySelector('#conteudo');
   _emp = empresaAtual();
-  if (!_emp) { alvo.innerHTML = `<div class="vazio"><h3>Sem produtora</h3></div>`; return; }
+  if (!_emp) { alvo.innerHTML = `<div class="vazio"><h3>Sem organização</h3></div>`; return; }
 
   alvo.innerHTML = `<div style="padding:40px;text-align:center;color:var(--texto-2)">Carregando documentos...</div>`;
   try {
@@ -52,7 +52,7 @@ function iconeArquivo(tipo, nome) {
 function pintar() {
   const alvo = document.querySelector('#conteudo');
 
-  const eventos = [...new Map(_docs.map(d => [d.evento_id, d.evento_nome])).entries()]
+  const contratos = [...new Map(_docs.map(d => [d.evento_id, d.evento_nome])).entries()]
     .map(([id, nome]) => ({ id, nome })).sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
   const categorias = [...new Set(_docs.map(d => d.categoria).filter(Boolean))].sort();
 
@@ -76,10 +76,10 @@ function pintar() {
     </div>
 
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
-      <input class="controle" id="d-busca" placeholder="Buscar por arquivo, item, receita ou categoria"
+      <input class="controle" id="d-busca" placeholder="Buscar por arquivo, item, repasse ou categoria"
              value="${esc(_busca)}" style="flex:1;min-width:220px">
       <select class="controle" id="d-evento" style="width:auto;min-width:150px">
-        <option value="">Todos os eventos</option>
+        <option value="">Todos os contratos</option>
         ${eventos.map(e => `<option value="${esc(e.id)}" ${_fEvento === e.id ? 'selected' : ''}>${esc(e.nome || '—')}</option>`).join('')}
       </select>
       <select class="controle" id="d-categoria" style="width:auto;min-width:150px">
@@ -92,8 +92,8 @@ function pintar() {
       <div class="cartao" style="padding:0;overflow:hidden">
         ${lista.map(d => {
           const vinc = d.item_id ? `Item: ${esc(d.item_nome || '—')}`
-                     : d.receita_id ? `Receita: ${esc(d.receita_nome || '—')}`
-                     : 'Evento';
+                     : d.receita_id ? `Repasse: ${esc(d.receita_nome || '—')}`
+                     : 'Contrato';
           const podeApagar = souAdmin(_emp.id);
           return `
           <div class="linha-lista" data-doc="${esc(d.id)}" data-caminho="${esc(d.caminho)}" style="cursor:pointer">
@@ -112,7 +112,7 @@ function pintar() {
       </div>` : `
       <div class="vazio">
         <h3>Nenhum documento</h3>
-        <p>${_docs.length ? 'Nada bate com o filtro.' : 'Anexe contratos, notas e recibos nos itens de produção e nas receitas — eles aparecem aqui.'}</p>
+        <p>${_docs.length ? 'Nada bate com o filtro.' : 'Anexe contratos, notas e recibos nos itens de produção e nos repasses — eles aparecem aqui.'}</p>
       </div>`}
   `;
 

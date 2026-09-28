@@ -2,7 +2,7 @@
 // Fornecedores e meios de pagamento
 //
 // Dado bancário de fornecedor é o vetor clássico de fraude
-// em produtora: alterar a chave PIX pouco antes de um
+// em organização: alterar a chave PIX pouco antes de um
 // pagamento grande. Por isso fica em tabela separada, só
 // visível para quem confirma pagamento, e toda alteração
 // é registrada.
@@ -21,7 +21,7 @@ export async function telaFornecedores() {
   const alvo = document.querySelector('#conteudo');
   _empresa = sessao.membros[0]?.empresa;
   if (!_empresa) {
-    alvo.innerHTML = `<div class="vazio"><h3>Sem produtora</h3><p>Você não está vinculado a nenhuma produtora.</p></div>`;
+    alvo.innerHTML = `<div class="vazio"><h3>Sem organização</h3><p>Você não está vinculado a nenhuma organização.</p></div>`;
     return;
   }
 
@@ -71,7 +71,7 @@ export async function telaFornecedores() {
       </div>` : `
       <div class="vazio">
         <h3>${_busca ? 'Nada encontrado' : 'Nenhum fornecedor ainda'}</h3>
-        <p>${_busca ? 'Tente outro termo.' : 'Cadastre quem você paga com frequência — os dados ficam salvos para todos os eventos.'}</p>
+        <p>${_busca ? 'Tente outro termo.' : 'Cadastre quem você paga com frequência — os dados ficam salvos para todos os contratos.'}</p>
         ${_busca ? '' : `<button class="botao botao-primario" id="novo2">Cadastrar fornecedor</button>`}
       </div>`}
   `;
@@ -103,7 +103,7 @@ function modalFornecedor(f) {
     <form id="ff">
       <div class="campo">
         <label for="f-nome">Nome</label>
-        <input class="controle" id="f-nome" value="${esc(f.nome || '')}" placeholder="A Produtora Ltda" required>
+        <input class="controle" id="f-nome" value="${esc(f.nome || '')}" placeholder="A Organização Ltda" required>
       </div>
       <div class="linha linha-2">
         <div class="campo">
