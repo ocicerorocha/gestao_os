@@ -81,7 +81,7 @@ function desenhar() {
     <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:6px">
       <h1 style="margin:0">${esc(_dados.emp?.nome || 'Painel')}</h1>
       <div style="display:flex;align-items:center;gap:12px">
-        <div style="font-size:13px;color:var(--texto-2)">${numero(eventos.length)} ${eventos.length === 1 ? 'evento' : 'eventos'}</div>
+        <div style="font-size:13px;color:var(--texto-2)">${numero(eventos.length)} ${eventos.length === 1 ? 'contrato' : 'contratos'}</div>
         <button class="botao" id="pe-pdf" style="height:32px;font-size:13px">Exportar PDF</button>
       </div>
     </div>
