@@ -13,7 +13,7 @@ import {
 } from './ui.js';
 import { telaEvento } from './evento.js';
 
-const FONTES_SUGERIDAS = ['Conta própria', 'Bilheteria', 'Patrocinador'];
+const FONTES_SUGERIDAS = ['Convênio', 'Edital', 'Contrato de gestão', 'Recurso próprio', 'Doação'];
 
 export async function telaEventos() {
   const app = document.getElementById('app');
@@ -145,7 +145,7 @@ async function modalEvento(id, aoSalvar) {
       <div class="campo">
         <label for="ev-nome">Nome do contrato</label>
         <input class="controle" id="ev-nome" value="${esc(ev.nome || '')}"
-               placeholder="São João Irecê 2027" ${podeEditar ? '' : 'disabled'} required>
+               placeholder="Nome ou número do contrato" ${podeEditar ? '' : 'disabled'} required>
       </div>
 
       <div class="campo">
@@ -178,19 +178,19 @@ async function modalEvento(id, aoSalvar) {
         <div class="campo">
           <label for="ev-cidade">Cidade</label>
           <input class="controle" id="ev-cidade" value="${esc(ev.cidade || '')}"
-                 placeholder="Irecê" ${podeEditar ? '' : 'disabled'}>
+                 placeholder="" ${podeEditar ? '' : 'disabled'}>
         </div>
         <div class="campo">
           <label for="ev-publico">Público estimado</label>
           <input class="controle" type="number" min="0" id="ev-publico"
-                 value="${esc(ev.publico_estimado ?? '')}" placeholder="12000" ${podeEditar ? '' : 'disabled'}>
+                 value="${esc(ev.publico_estimado ?? '')}" placeholder="" ${podeEditar ? '' : 'disabled'}>
         </div>
       </div>
 
       <div class="campo">
         <label for="ev-local">Local</label>
         <input class="controle" id="ev-local" value="${esc(ev.local || '')}"
-               placeholder="Parque de Exposições" ${podeEditar ? '' : 'disabled'}>
+               placeholder="" ${podeEditar ? '' : 'disabled'}>
       </div>
 
       ${edicao ? `
@@ -202,14 +202,17 @@ async function modalEvento(id, aoSalvar) {
           </select>
         </div>` : `
         <div class="campo">
-          <label>Fontes de pagamento</label>
-          <div id="ev-fontes" style="display:flex;flex-direction:column;gap:7px">
-            ${FONTES_SUGERIDAS.map(f => `
-              <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer">
-                <input type="checkbox" class="ev-fonte" value="${esc(f)}" checked> ${esc(f)}
-              </label>`).join('')}
+          <label>Fontes de recurso</label>
+          <div style="display:flex;gap:8px">
+            <input class="controle" id="ev-fonte-nova" list="ev-fontes-sugeridas"
+                   placeholder="Ex.: Convênio, Edital, Contrato de gestão">
+            <button type="button" class="botao" id="ev-fonte-add">Adicionar</button>
           </div>
-          <div class="dica">De onde o dinheiro sai. Você escolhe a fonte na hora de pagar, não agora — e pode editar essa lista depois.</div>
+          <datalist id="ev-fontes-sugeridas">
+            ${FONTES_SUGERIDAS.map(f => `<option value="${esc(f)}"></option>`).join('')}
+          </datalist>
+          <div id="ev-fontes" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"></div>
+          <div class="dica">De onde vem o dinheiro para pagar as despesas. Adicione quantas quiser — você escolhe a fonte na hora de pagar, e pode editar essa lista depois.</div>
         </div>`}
 
       <div class="campo">
@@ -240,6 +243,34 @@ async function modalEvento(id, aoSalvar) {
 
   const q = s => document.querySelector(s);
   let arquivoLogo = null;
+
+  // Fontes de recurso: campo aberto, com várias fontes
+  const fontesNovas = [];
+  function pintarFontes() {
+    const box = q('#ev-fontes');
+    if (!box) return;
+    box.innerHTML = fontesNovas.map((f, idx) =>
+      `<span class="etiqueta etiqueta-neutra" style="display:inline-flex;align-items:center;gap:6px">
+         ${esc(f)}
+         <button type="button" data-fonte="${idx}" aria-label="Remover ${esc(f)}"
+                 style="background:none;border:none;cursor:pointer;font-size:15px;line-height:1;padding:0;color:var(--texto-2)">&times;</button>
+       </span>`).join('');
+    box.querySelectorAll('[data-fonte]').forEach(b =>
+      b.addEventListener('click', () => { fontesNovas.splice(+b.dataset.fonte, 1); pintarFontes(); }));
+  }
+  function adicionarFonte() {
+    const inp = q('#ev-fonte-nova');
+    const v = (inp?.value || '').trim();
+    if (!v) return;
+    if (!fontesNovas.some(f => f.toLowerCase() === v.toLowerCase())) fontesNovas.push(v);
+    inp.value = '';
+    inp.focus();
+    pintarFontes();
+  }
+  q('#ev-fonte-add')?.addEventListener('click', adicionarFonte);
+  q('#ev-fonte-nova')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); adicionarFonte(); }
+  });
 
   q('#ev-cancelar').addEventListener('click', fecharModal);
 
@@ -290,9 +321,8 @@ async function modalEvento(id, aoSalvar) {
           dados.dono_id = sessao.usuario.id;
           const novo = await criarEvento(dados);
 
-          const marcadas = [...document.querySelectorAll('.ev-fonte:checked')].map(c => c.value);
-          if (marcadas.length) {
-            try { await criarFontes(novo.id, marcadas); }
+          if (fontesNovas.length) {
+            try { await criarFontes(novo.id, fontesNovas); }
             catch (err) { aviso('Contrato criado, mas as fontes falharam: ' + err.message, 'aviso'); }
           }
           aviso('Contrato criado.');
