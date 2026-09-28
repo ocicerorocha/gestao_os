@@ -76,7 +76,7 @@ function pintar() {
     </div>
 
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
-      <input class="controle" id="d-busca" placeholder="Buscar por arquivo, item, receita ou categoria"
+      <input class="controle" id="d-busca" placeholder="Buscar por arquivo, item, repasse ou categoria"
              value="${esc(_busca)}" style="flex:1;min-width:220px">
       <select class="controle" id="d-evento" style="width:auto;min-width:150px">
         <option value="">Todos os contratos</option>
