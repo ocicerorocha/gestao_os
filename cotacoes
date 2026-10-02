@@ -1,0 +1,47 @@
+-- ═══════════════════════════════════════════════════════════════
+-- AdminOS — 3 cotações por item (orçamentos)
+-- Rode UMA VEZ no SQL Editor do Supabase.
+-- A tabela herda o acesso do item/contrato (mesma regra do item).
+-- ═══════════════════════════════════════════════════════════════
+
+create table if not exists public.cotacao (
+  id              uuid primary key default gen_random_uuid(),
+  item_id         uuid not null references public.item_producao(id) on delete cascade,
+  fornecedor_nome text not null,
+  valor           numeric(14,2),
+  observacao      text,
+  escolhida       boolean not null default false,
+  ordem           integer,
+  criada_em       timestamptz not null default now()
+);
+
+create index if not exists cotacao_item_idx on public.cotacao(item_id);
+
+alter table public.cotacao enable row level security;
+
+-- Ver: quem enxerga o contrato do item
+create policy cotacao_ver on public.cotacao for select
+  using (public.vejo_evento(
+    (select evento_id from public.item_producao i where i.id = cotacao.item_id)));
+
+-- Criar / editar / apagar: quem edita o descritivo do contrato (e contrato aberto)
+create policy cotacao_criar on public.cotacao for insert
+  with check (
+    public.posso_editar_producao(
+      (select evento_id from public.item_producao i where i.id = cotacao.item_id))
+    and public.evento_aberto(
+      (select evento_id from public.item_producao i where i.id = cotacao.item_id)));
+
+create policy cotacao_editar on public.cotacao for update
+  using (public.posso_editar_producao(
+    (select evento_id from public.item_producao i where i.id = cotacao.item_id)))
+  with check (public.posso_editar_producao(
+    (select evento_id from public.item_producao i where i.id = cotacao.item_id)));
+
+create policy cotacao_apagar on public.cotacao for delete
+  using (public.posso_editar_producao(
+    (select evento_id from public.item_producao i where i.id = cotacao.item_id)));
+
+grant all on table public.cotacao to anon;
+grant all on table public.cotacao to authenticated;
+grant all on table public.cotacao to service_role;
