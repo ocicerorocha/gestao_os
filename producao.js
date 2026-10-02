@@ -9,7 +9,7 @@
 
 import {
   empresaAtual, listarCategorias, criarCategoria, listarFornecedores, salvarFornecedor,
-  salvarItem, apagarItem, listarPrestacao, salvarPrestacao, apagarPrestacao,
+  salvarItem, apagarItem, listarCotacoes, salvarCotacoes, listarPrestacao, salvarPrestacao, apagarPrestacao,
   andamentoItens,
   documentosDoItem, anexarDocumento, apagarDocumento, linkDocumento,
 } from './nucleo.js';
@@ -309,10 +309,17 @@ function linha(i, podeEditar, podeSolicitar) {
 
 /* ── cadastro do item ──────────────────────────────── */
 
-function modalItem(item) {
+async function modalItem(item) {
   const edicao = !!item;
   const i = item || {};
   const podeAdmin = contexto.permissao?.admin;   // mestre ou administrador
+
+  // Cotações: carrega as existentes (edição) e completa até 3 linhas.
+  let cotExistentes = [];
+  if (edicao) { try { cotExistentes = await listarCotacoes(i.id); } catch (_) { cotExistentes = []; } }
+  const cotLinhas = [0, 1, 2].map(n => cotExistentes[n] || {});
+  let cotEscolhida = cotExistentes.findIndex(c => c.escolhida);
+  if (cotEscolhida < 0) cotEscolhida = null;
 
   abrirModal(edicao ? `Item ${String(i.numero).padStart(3, '0')}` : 'Novo item', `
     <form id="fi">
@@ -322,23 +329,32 @@ function modalItem(item) {
                placeholder="Descrição do item ou serviço" required>
       </div>
 
-      <div class="linha linha-2">
-        <div class="campo">
-          <label for="i-cat">Categoria</label>
-          <select class="controle" id="i-cat">
-            <option value="">— sem categoria —</option>
-            ${_categorias.map(c => `<option value="${esc(c.id)}" ${i.categoria_id === c.id ? 'selected' : ''}>${esc(c.nome)}</option>`).join('')}
-            <option value="__nova">+ criar categoria</option>
-          </select>
+      <div class="campo">
+        <label for="i-cat">Categoria (rubrica)</label>
+        <select class="controle" id="i-cat">
+          <option value="">— sem categoria —</option>
+          ${_categorias.map(c => `<option value="${esc(c.id)}" ${i.categoria_id === c.id ? 'selected' : ''}>${esc(c.nome)}</option>`).join('')}
+          <option value="__nova">+ criar categoria</option>
+        </select>
+      </div>
+
+      <div class="campo">
+        <label>Cotações <span style="font-weight:400;color:var(--texto-2);font-size:12px">— até 3 orçamentos, selecione a vencedora</span></label>
+        <datalist id="cot-fornecedores">
+          ${_fornecedores.map(f => `<option value="${esc(f.nome)}"></option>`).join('')}
+        </datalist>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          ${cotLinhas.map((c, n) => `
+            <div class="cot-linha" data-linha="${n}" style="display:grid;grid-template-columns:minmax(0,1.2fr) 110px minmax(0,1fr) auto;gap:8px;align-items:center">
+              <input class="controle cot-forn" list="cot-fornecedores" placeholder="Fornecedor ${n + 1}" value="${esc(c.fornecedor_nome || '')}">
+              <input class="controle cot-valor" data-moeda placeholder="0,00" value="${c.valor ?? ''}">
+              <input class="controle cot-obs" placeholder="Observação" value="${esc(c.observacao || '')}">
+              <button type="button" class="botao cot-sel ${cotEscolhida === n ? 'botao-primario' : ''}" data-sel="${n}">
+                ${cotEscolhida === n ? '✓ Vencedora' : 'Selecionar'}
+              </button>
+            </div>`).join('')}
         </div>
-        <div class="campo">
-          <label for="i-forn">Fornecedor</label>
-          <select class="controle" id="i-forn">
-            <option value="">— a definir —</option>
-            ${_fornecedores.map(f => `<option value="${esc(f.id)}" ${i.fornecedor_id === f.id ? 'selected' : ''}>${esc(f.nome)}</option>`).join('')}
-            <option value="__novo">+ cadastrar fornecedor</option>
-          </select>
-        </div>
+        <div class="dica">A cotação selecionada define o fornecedor e o valor orçado do item. Pode salvar sem escolher — fica <b>em cotação</b>.</div>
       </div>
 
       <div class="linha linha-2">
@@ -441,8 +457,28 @@ function modalItem(item) {
     } catch (err) { aviso(err.message, 'erro'); }
   });
 
-  ligarCadastroRapido('#i-forn', _fornecedores,
-    nome => salvarFornecedor(empresaAtual().id, null, { nome }));
+  // Cotações: selecionar a vencedora
+  let escolhida = cotEscolhida;
+  const pintarEscolha = () => {
+    document.querySelectorAll('.cot-sel').forEach(btn => {
+      const n = Number(btn.dataset.sel);
+      const venc = n === escolhida;
+      btn.classList.toggle('botao-primario', venc);
+      btn.textContent = venc ? '✓ Vencedora' : 'Selecionar';
+    });
+  };
+  document.querySelectorAll('.cot-sel').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const n = Number(btn.dataset.sel);
+      escolhida = (escolhida === n) ? null : n;   // clicar de novo desmarca
+      pintarEscolha();
+      if (escolhida != null) {
+        const linha = document.querySelector(`.cot-linha[data-linha="${escolhida}"]`);
+        const v = lerMoeda(linha.querySelector('.cot-valor'));
+        if (v) { q('#i-valor').value = v.toFixed(2); q('#i-valor').dispatchEvent(new Event('input')); }
+      }
+    });
+  });
 
   const calcular = () => {
     const v = (Number(q('#i-qnt').value) || 0) * (Number(q('#i-dias').value) || 0) * lerMoeda(q('#i-unit'));
@@ -478,10 +514,10 @@ function modalItem(item) {
 
     await comBotao(q('#i-salvar'), async () => {
       try {
-        await salvarItem(contexto.evento.id, i.id || null, {
+        const itemSalvo = await salvarItem(contexto.evento.id, i.id || null, {
           descricao,
           categoria_id: q('#i-cat').value === '__nova' ? '' : q('#i-cat').value,
-          fornecedor_id: q('#i-forn').value === '__novo' ? '' : q('#i-forn').value,
+          fornecedor_id: i.fornecedor_id || null,   // mantém; a cotação vencedora sobrescreve abaixo
           valor_orcado: lerMoeda(q('#i-valor')),
           custo_referencia: q('#i-ref').value ? lerMoeda(q('#i-ref')) : '',
           situacao: q('#i-sit').value,
@@ -491,6 +527,22 @@ function modalItem(item) {
           dias: q('#i-dias').value,
           valor_unitario: q('#i-unit').value ? lerMoeda(q('#i-unit')) : '',
         });
+
+        // grava as cotações e sincroniza o fornecedor/valor da vencedora
+        const cotacoesForm = [...document.querySelectorAll('.cot-linha')].map(linha => {
+          const v = lerMoeda(linha.querySelector('.cot-valor'));
+          return {
+            fornecedor_nome: linha.querySelector('.cot-forn').value,
+            valor: v ? v : '',
+            observacao: linha.querySelector('.cot-obs').value,
+          };
+        });
+        try {
+          await salvarCotacoes(empresaAtual().id, itemSalvo.id, cotacoesForm, escolhida);
+        } catch (err) {
+          aviso('Item salvo, mas as cotações falharam: ' + err.message, 'aviso', 8000);
+        }
+
         aviso(edicao ? 'Item atualizado.' : 'Item cadastrado.');
         fecharModal();
         await recarregarItens();
