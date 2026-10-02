@@ -16,6 +16,7 @@ const ABAS = [
   { id: 'solicitacoes', rotulo: 'Solicitações' },
   { id: 'aprovacoes',   rotulo: 'Aprovações', perm: 'aprovar_pagamento' },
   { id: 'receitas',     rotulo: 'Repasses',   perm: 'ver_receitas' },
+  { id: 'prestacao',    rotulo: 'Prestação de contas' },
 ];
 
 function abasVisiveis() {
@@ -114,6 +115,7 @@ function desenhar() {
   else if (contexto.aba === 'solicitacoes') abaSolicitacoes(corpo);
   else if (contexto.aba === 'aprovacoes')   abaAprovacoes(corpo);
   else if (contexto.aba === 'receitas')     abaReceitas(corpo);
+  else if (contexto.aba === 'prestacao')    abaPrestacaoPreview(corpo);
   else                                       abaPainel(corpo);
 }
 
@@ -121,6 +123,47 @@ function desenhar() {
 
 function pontinho(cor) {
   return `<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${cor};margin-right:5px;vertical-align:middle"></span>`;
+}
+
+// Prévia da Prestação de contas — a função definitiva depende do
+// modelo exigido pelo órgão; aqui mostramos a visão do que virá.
+function abaPrestacaoPreview(alvo) {
+  alvo.innerHTML = `
+    <div class="cartao" style="max-width:760px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+        <h2 style="margin:0;font-size:18px">Prestação de contas</h2>
+        <span class="etiqueta etiqueta-acento">Em desenvolvimento</span>
+      </div>
+      <p style="color:var(--texto-2);font-size:14px;margin-bottom:18px">
+        Aqui o sistema vai gerar o relatório de prestação de contas deste contrato,
+        pronto para entrega ao órgão — com exportação em PDF. O formato final será
+        ajustado ao modelo exigido pelo concedente.
+      </p>
+
+      <div style="font-size:13px;font-weight:600;color:var(--texto-2);margin-bottom:8px">O relatório vai reunir:</div>
+      <ul style="font-size:14px;line-height:1.9;margin:0 0 20px 18px">
+        <li><b>Execução por rubrica</b> — orçado × pago em cada categoria, com saldo</li>
+        <li><b>Repasses recebidos</b> × <b>despesas realizadas</b>, por fonte de recurso</li>
+        <li><b>Relação de pagamentos</b> com fornecedor, data e comprovante</li>
+        <li><b>Saldo do contrato</b> e conciliação com o extrato</li>
+      </ul>
+
+      <div style="font-size:12px;color:var(--texto-3);margin-bottom:8px">Prévia do quadro por rubrica</div>
+      <table class="tabela" style="opacity:.75">
+        <thead>
+          <tr><th>Rubrica</th><th class="num">Orçado</th><th class="num">Pago</th><th class="num">Saldo</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Recursos humanos</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+          <tr><td>Serviços de terceiros (PJ)</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+          <tr><td>Material de consumo</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+        </tbody>
+      </table>
+
+      <p style="font-size:12px;color:var(--texto-3);margin-top:16px">
+        Assim que o Instituto enviar o modelo de prestação de contas usado, montamos este relatório no formato exato.
+      </p>
+    </div>`;
 }
 
 async function abaPainel(alvo) {
