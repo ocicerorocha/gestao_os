@@ -554,6 +554,68 @@ export async function apagarItem(id) {
   if (error) throw new Error(traduzErro(error.message));
 }
 
+/* ── cotações (até 3 orçamentos por item) ──────────── */
+
+/** Cotações de um item, em ordem. */
+export async function listarCotacoes(itemId) {
+  if (!itemId) return [];
+  const { data, error } = await bd
+    .from('cotacao')
+    .select('id, fornecedor_nome, valor, observacao, escolhida, ordem')
+    .eq('item_id', itemId)
+    .order('ordem', { ascending: true });
+  if (error) throw new Error(traduzErro(error.message));
+  return data || [];
+}
+
+// Acha um fornecedor da empresa pelo nome (ignorando caixa) ou cria um novo.
+async function fornecedorPorNome(empresaId, nome) {
+  const alvo = (nome || '').trim();
+  if (!alvo) return null;
+  const { data } = await bd.from('fornecedor')
+    .select('id').eq('empresa_id', empresaId).ilike('nome', alvo).limit(1);
+  if (data && data.length) return data[0].id;
+  const novo = await salvarFornecedor(empresaId, null, { nome: alvo });
+  return novo.id;
+}
+
+/**
+ * Regrava as cotações do item: apaga as antigas e insere as atuais.
+ * `linhas` = [{fornecedor_nome, valor, observacao}] (índices 0..n).
+ * `escolhida` = índice da vencedora em `linhas`, ou null.
+ * Havendo vencedora, sincroniza fornecedor e valor orçado do item.
+ */
+export async function salvarCotacoes(empresaId, itemId, linhas, escolhida) {
+  const validas = (linhas || [])
+    .map((l, i) => ({ ...l, _i: i }))
+    .filter(l => (l.fornecedor_nome || '').trim() || (l.valor !== '' && l.valor != null));
+
+  await bd.from('cotacao').delete().eq('item_id', itemId);
+
+  if (validas.length) {
+    const linhasBd = validas.map((l, idx) => ({
+      item_id: itemId,
+      fornecedor_nome: (l.fornecedor_nome || '').trim() || '(sem nome)',
+      valor: (l.valor === '' || l.valor == null) ? null : Number(l.valor),
+      observacao: (l.observacao || '').trim() || null,
+      escolhida: l._i === escolhida,
+      ordem: idx + 1,
+    }));
+    const { error } = await bd.from('cotacao').insert(linhasBd);
+    if (error) throw new Error(traduzErro(error.message));
+  }
+
+  // sincroniza o item com a cotação vencedora
+  if (escolhida != null && linhas[escolhida]) {
+    const venc = linhas[escolhida];
+    const patch = { fornecedor_id: await fornecedorPorNome(empresaId, venc.fornecedor_nome) };
+    if (venc.valor !== '' && venc.valor != null) patch.valor_orcado = Number(venc.valor);
+    const { error } = await bd.from('item_producao').update(patch).eq('id', itemId);
+    if (error) throw new Error(traduzErro(error.message));
+  }
+  return listarCotacoes(itemId);
+}
+
 /** Grava vários itens de uma vez. Usado pela importação. */
 export async function criarItensEmLote(eventoId, linhas) {
   const prontos = linhas.map(l => ({
