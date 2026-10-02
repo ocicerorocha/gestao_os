@@ -16,6 +16,7 @@ import { telaUsuarios } from './usuarios.js';
 import { telaFornecedores } from './fornecedores.js';
 import { telaProdutora } from './produtora.js';
 import { telaPagamentos } from './pagamentos.js';
+import { telaDocumentos } from './documentos.js';
 
 aplicarTema(temaAtual());
 iniciarModal();
@@ -65,6 +66,7 @@ const SECOES = [
   { id: 'painel', rotulo: 'Painel', tela: telaPainelEmpresa, perm: 'ver_painel' },
   { id: 'eventos',      rotulo: 'Contratos',      tela: telaEventos,      sempre: true },
   { id: 'pagamentos',   rotulo: 'Pagamentos',   tela: telaPagamentos,   pagador: true },
+  { id: 'documentos',   rotulo: 'Documentos',   tela: telaDocumentos,   sempre: true },
   { id: 'fornecedores', rotulo: 'Fornecedores', tela: telaFornecedores, perm: 'gerir_fornecedores' },
   { id: 'usuarios',     rotulo: 'Usuários',     tela: telaUsuarios,     perm: 'gerir_usuarios' },
   { id: 'produtora',    rotulo: 'Organização',    tela: telaProdutora,    sempre: true },
