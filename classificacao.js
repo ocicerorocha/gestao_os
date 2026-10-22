@@ -2,7 +2,7 @@
 // Classificação financeira — árvore de rubricas do contrato
 //
 // A árvore é o PLANEJADO (grupos, subgrupos e itens com o
-// valor orçado). Os lançamentos (realizado) se amarram aos
+// valor orçado). Os LANÇAMENTOS (realizado) se amarram aos
 // itens-folha. Importa o "Quadro Orçamentário Analítico".
 // ═══════════════════════════════════════════════════════
 
@@ -10,13 +10,17 @@ import { contexto } from './evento.js';
 import {
   listarClassificacao, importarClassificacao,
   salvarNoClassificacao, apagarNoClassificacao,
+  listarLancamentos, salvarLancamento, apagarLancamento,
+  listarFornecedores, empresaAtual,
 } from './nucleo.js';
 import {
   esc, aviso, abrirModal, fecharModal, comBotao,
-  moeda, numero, aplicarMascaraMoeda, lerMoeda,
+  moeda, numero, dataBR, aplicarMascaraMoeda, lerMoeda,
 } from './ui.js';
 
 let _alvo = null;
+let _realizado = {};   // classificacao_id -> soma dos lançamentos
+let _forns = null;     // cache de fornecedores (datalist)
 const recarregar = () => _alvo && abaClassificacao(_alvo);
 
 export async function abaClassificacao(alvo) {
@@ -26,47 +30,76 @@ export async function abaClassificacao(alvo) {
     return;
   }
   alvo.innerHTML = `<div style="padding:30px;text-align:center;color:var(--texto-2)">Carregando classificação...</div>`;
-  let nos;
-  try { nos = await listarClassificacao(contexto.evento.id); }
-  catch (e) { alvo.innerHTML = `<div class="vazio"><h3>Não consegui carregar</h3><p>${esc(e.message)}</p></div>`; return; }
+  let nos, lancs;
+  try {
+    [nos, lancs] = await Promise.all([
+      listarClassificacao(contexto.evento.id),
+      listarLancamentos(contexto.evento.id),
+    ]);
+  } catch (e) {
+    alvo.innerHTML = `<div class="vazio"><h3>Não consegui carregar</h3><p>${esc(e.message)}</p></div>`;
+    return;
+  }
+  _realizado = {};
+  for (const l of lancs) {
+    if (l.classificacao_id) _realizado[l.classificacao_id] = (_realizado[l.classificacao_id] || 0) + Number(l.valor || 0);
+  }
   pintar(alvo, nos);
 }
 
-// Subtotal de um grupo = soma do orçado dos itens-folha abaixo dele (pelo código).
-function subtotal(nos, g) {
+// orçado dos itens-folha abaixo de um grupo (pelo código)
+function subtotalOrcado(nos, g) {
   if (!g.codigo) return 0;
   const pref = g.codigo + '.';
   return nos.filter(n => !n.eh_grupo && (n.codigo || '').startsWith(pref))
             .reduce((a, n) => a + Number(n.valor_orcado || 0), 0);
 }
+// realizado dos itens-folha abaixo de um grupo
+function subtotalReal(nos, g) {
+  if (!g.codigo) return 0;
+  const pref = g.codigo + '.';
+  return nos.filter(n => !n.eh_grupo && (n.codigo || '').startsWith(pref))
+            .reduce((a, n) => a + Number(_realizado[n.id] || 0), 0);
+}
+
+function parValores(real, orc) {
+  const pct = orc > 0 ? Math.round(real / orc * 100) : 0;
+  const cor = orc > 0 && real > orc ? 'var(--vermelho)' : 'var(--texto)';
+  return `<span style="white-space:nowrap"><span style="color:${cor}">${moeda(real)}</span>
+    <span style="color:var(--texto-3)"> / ${moeda(orc)}${orc > 0 ? ` · ${pct}%` : ''}</span></span>`;
+}
 
 function pintar(alvo, nos) {
   const podeEditar = contexto.permissao?.admin || contexto.permissao?.editar_producao;
-  const grand = nos.filter(n => !n.eh_grupo).reduce((a, n) => a + Number(n.valor_orcado || 0), 0);
+  const grandOrc = nos.filter(n => !n.eh_grupo).reduce((a, n) => a + Number(n.valor_orcado || 0), 0);
+  const grandReal = Object.values(_realizado).reduce((a, v) => a + Number(v || 0), 0);
 
   const linhas = nos.map(n => {
     const ind = (n.nivel || 0) * 18;
     const cod = n.codigo ? `<span style="color:var(--texto-3);font-weight:500">${esc(n.codigo)}</span> ` : '';
     if (n.eh_grupo) {
       return `<div class="cl-linha" data-id="${esc(n.id)}" style="padding:8px;margin-left:${ind}px;display:flex;justify-content:space-between;gap:10px;font-weight:600;border-top:1px solid var(--borda);cursor:pointer">
-        <span>${cod}${esc(n.nome)}</span><span style="white-space:nowrap">${moeda(subtotal(nos, n))}</span></div>`;
+        <span>${cod}${esc(n.nome)}</span>${parValores(subtotalReal(nos, n), subtotalOrcado(nos, n))}</div>`;
     }
     const q = n.qtde ? ` <span style="color:var(--texto-3);font-size:12px">· qtde ${numero(n.qtde)}</span>` : '';
     return `<div class="cl-linha" data-id="${esc(n.id)}" style="padding:6px 8px;margin-left:${ind}px;display:flex;justify-content:space-between;gap:10px;cursor:pointer">
-      <span>${cod}${esc(n.nome)}${q}</span>
-      <span style="white-space:nowrap">${n.valor_orcado != null ? moeda(n.valor_orcado) : '—'}</span></div>`;
+      <span>${cod}${esc(n.nome)}${q}</span>${parValores(Number(_realizado[n.id] || 0), Number(n.valor_orcado || 0))}</div>`;
   }).join('');
 
   alvo.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
-      <div><div class="rotulo">Orçado total do contrato</div><div style="font-size:20px;font-weight:700">${moeda(grand)}</div></div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+      <div>
+        <div class="rotulo">Realizado / Orçado do contrato</div>
+        <div style="font-size:20px;font-weight:700">${moeda(grandReal)} <span style="color:var(--texto-3);font-size:15px;font-weight:500">/ ${moeda(grandOrc)}</span></div>
+      </div>
       ${podeEditar ? `<div style="display:flex;gap:8px;flex-wrap:wrap">
         <input type="file" id="cl-arquivo" accept=".xlsx,.xls" style="display:none">
         <button class="botao" id="cl-importar">Importar planilha</button>
         <button class="botao" id="cl-novo">Adicionar linha</button>
       </div>` : ''}
     </div>
-    ${nos.length ? `<div class="cartao" style="padding:2px">${linhas}</div>` : `
+    ${nos.length ? `<div class="cartao" style="padding:2px">${linhas}</div>
+      <div class="dica" style="margin-top:8px">Clique num <b>item</b> para ver o detalhe e lançar despesas; num <b>grupo</b> para editar.</div>` : `
       <div class="vazio">
         <h3>Sem classificação ainda</h3>
         <p>Importe a planilha de classificação financeira do contrato (Quadro Orçamentário Analítico) para montar a árvore de rubricas.</p>
@@ -86,14 +119,13 @@ function pintar(alvo, nos) {
   alvo.querySelectorAll('.cl-linha').forEach(el =>
     el.addEventListener('click', () => {
       const no = nos.find(n => String(n.id) === el.dataset.id);
-      if (no) modalNo(no);
+      if (!no) return;
+      if (no.eh_grupo) modalNo(no); else detalheRubrica(no);
     }));
 }
 
 /* ── importação da planilha (Quadro Analítico) ────────── */
 
-// Lê as colunas Código(A) · Descrição(B) · Qtde(C) · Valor/mês(D) · Valor total(E).
-// Pula as linhas de vagas (números soltos). Grupo = quem tem filhos.
 function parseQuadro(rows) {
   const NODE = /^[A-Z]+(\.\d+)*$/;
   const raw = [];
@@ -131,7 +163,7 @@ async function importarPlanilha(file, alvo) {
   }
 }
 
-/* ── editar/adicionar um nó ────────────────────────────── */
+/* ── editar/adicionar um nó (estrutura) ────────────────── */
 
 function modalNo(no) {
   const ed = !!no;
@@ -198,6 +230,132 @@ function modalNo(no) {
         aviso(ed ? 'Salvo.' : 'Adicionado.');
         fecharModal();
         recarregar();
+      } catch (err) { aviso(err.message, 'erro'); }
+    });
+  });
+}
+
+/* ── detalhe da rubrica: orçado × realizado + lançamentos ─ */
+
+async function detalheRubrica(no) {
+  let lancs = [];
+  try { lancs = await listarLancamentos(contexto.evento.id, no.id); }
+  catch (e) { return aviso(e.message, 'erro'); }
+  const real = lancs.reduce((a, l) => a + Number(l.valor || 0), 0);
+  const orc = Number(no.valor_orcado || 0);
+  const pct = orc > 0 ? Math.round(real / orc * 100) : 0;
+  const podeEditar = contexto.permissao?.admin || contexto.permissao?.editar_producao;
+
+  abrirModal(`${no.codigo ? no.codigo + ' · ' : ''}${esc(no.nome)}`, `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div class="metrica">
+        <div class="rotulo">Orçado${no.qtde ? ` · qtde ${numero(no.qtde)}` : ''}</div>
+        <div class="valor" style="font-size:16px">${moeda(orc)}</div>
+      </div>
+      <div class="metrica">
+        <div class="rotulo">Realizado${orc > 0 ? ` · ${pct}%` : ''}</div>
+        <div class="valor" style="font-size:16px;color:${orc > 0 && real > orc ? 'var(--vermelho)' : 'var(--verde)'}">${moeda(real)}</div>
+      </div>
+    </div>
+    ${podeEditar ? `<button class="botao botao-primario" id="rb-novo" style="margin-bottom:12px">Adicionar lançamento</button>` : ''}
+    ${lancs.length ? `<div style="display:flex;flex-direction:column;gap:6px">
+      ${lancs.map(l => `<div class="rb-lanc" data-id="${esc(l.id)}" style="display:flex;justify-content:space-between;gap:10px;padding:9px 10px;cursor:pointer;background:var(--superficie-2);border-radius:8px">
+        <span>${esc(l.fornecedor?.nome || l.descricao || 'Lançamento')}${l.data_pagamento ? ` <span style="color:var(--texto-3);font-size:12px">· ${dataBR(l.data_pagamento)}</span>` : ''}</span>
+        <span style="white-space:nowrap">${moeda(l.valor)}</span></div>`).join('')}
+    </div>` : `<div class="dica">Nenhum lançamento nesta rubrica ainda.</div>`}
+    <div class="modal-acoes" style="margin-top:14px">
+      ${podeEditar ? `<button type="button" class="botao" id="rb-editar" style="margin-right:auto">Editar rubrica</button>` : ''}
+      <button type="button" class="botao" id="rb-fechar">Fechar</button>
+    </div>`);
+
+  const q = s => document.querySelector(s);
+  q('#rb-fechar').addEventListener('click', () => { fecharModal(); recarregar(); });
+  q('#rb-editar')?.addEventListener('click', () => modalNo(no));
+  q('#rb-novo')?.addEventListener('click', () => modalLancamento(no, null));
+  document.querySelectorAll('.rb-lanc').forEach(el =>
+    el.addEventListener('click', () => {
+      const l = lancs.find(x => String(x.id) === el.dataset.id);
+      if (l) modalLancamento(no, l);
+    }));
+}
+
+/* ── lançamento manual (nota entra depois, lendo o arquivo) ─ */
+
+async function modalLancamento(no, lanc) {
+  const ed = !!lanc;
+  const l = lanc || {};
+  if (!_forns) { try { _forns = await listarFornecedores(empresaAtual()?.id); } catch (_) { _forns = []; } }
+  const FORMAS = ['Boleto', 'Pix', 'Transferência', 'Dinheiro', 'Cartão', 'Outro'];
+
+  abrirModal(ed ? 'Editar lançamento' : 'Novo lançamento', `
+    <form id="flan">
+      <div class="campo">
+        <label for="l-forn">Fornecedor</label>
+        <input class="controle" id="l-forn" list="l-forns" value="${esc(l.fornecedor?.nome || '')}" placeholder="Nome do fornecedor">
+        <datalist id="l-forns">${_forns.map(f => `<option value="${esc(f.nome)}"></option>`).join('')}</datalist>
+      </div>
+      <div class="campo">
+        <label for="l-desc">Descrição</label>
+        <input class="controle" id="l-desc" value="${esc(l.descricao || '')}" placeholder="Ex.: Nota fiscal nº...">
+      </div>
+      <div class="linha linha-2">
+        <div class="campo">
+          <label for="l-valor">Valor</label>
+          <input class="controle" id="l-valor" data-moeda value="${l.valor ?? ''}" required>
+        </div>
+        <div class="campo">
+          <label for="l-emis">Data de emissão</label>
+          <input class="controle" type="date" id="l-emis" value="${esc((l.data_competencia || '').slice(0, 10))}">
+        </div>
+      </div>
+      <div class="linha linha-2">
+        <div class="campo">
+          <label for="l-pgto">Data de pagamento</label>
+          <input class="controle" type="date" id="l-pgto" value="${esc((l.data_pagamento || '').slice(0, 10))}">
+        </div>
+        <div class="campo">
+          <label for="l-forma">Forma de pagamento</label>
+          <select class="controle" id="l-forma"><option value="">—</option>${FORMAS.map(f => `<option ${l.forma_pagamento === f ? 'selected' : ''}>${f}</option>`).join('')}</select>
+        </div>
+      </div>
+      <div class="campo">
+        <label for="l-doc">Nº do documento / nota</label>
+        <input class="controle" id="l-doc" value="${esc(l.documento_numero || '')}">
+      </div>
+      <div class="campo">
+        <label for="l-obs">Observações</label>
+        <textarea class="controle" id="l-obs">${esc(l.observacoes || '')}</textarea>
+      </div>
+      <div class="modal-acoes">
+        ${ed ? `<button type="button" class="botao botao-perigo" id="l-apagar" style="margin-right:auto">Apagar</button>` : ''}
+        <button type="button" class="botao" id="l-cancelar">Cancelar</button>
+        <button type="submit" class="botao botao-primario" id="l-salvar">${ed ? 'Salvar' : 'Adicionar'}</button>
+      </div>
+    </form>`);
+
+  aplicarMascaraMoeda();
+  const q = s => document.querySelector(s);
+  q('#l-cancelar').addEventListener('click', () => detalheRubrica(no));
+  q('#l-apagar')?.addEventListener('click', async () => {
+    if (!confirm('Apagar este lançamento?')) return;
+    try { await apagarLancamento(l.id); aviso('Removido.'); detalheRubrica(no); }
+    catch (e) { aviso(e.message, 'erro'); }
+  });
+  q('#flan').addEventListener('submit', async e => {
+    e.preventDefault();
+    const valor = lerMoeda(q('#l-valor'));
+    if (!valor) return aviso('Informe o valor.', 'aviso');
+    await comBotao(q('#l-salvar'), async () => {
+      try {
+        await salvarLancamento(contexto.evento.id, l.id || null, {
+          classificacao_id: no.id, tipo: 'despesa',
+          fornecedor_nome: q('#l-forn').value, descricao: q('#l-desc').value,
+          valor, data_competencia: q('#l-emis').value || null, data_pagamento: q('#l-pgto').value || null,
+          forma_pagamento: q('#l-forma').value || null, documento_numero: q('#l-doc').value,
+          observacoes: q('#l-obs').value,
+        });
+        aviso(ed ? 'Salvo.' : 'Lançamento adicionado.');
+        detalheRubrica(no);
       } catch (err) { aviso(err.message, 'erro'); }
     });
   });

@@ -679,6 +679,49 @@ export async function apagarNoClassificacao(id) {
   if (error) throw new Error(traduzErro(error.message));
 }
 
+/* ── lançamentos (realizado por rubrica) ──────────────── */
+
+/** Lançamentos do contrato; filtra por rubrica se informada. */
+export async function listarLancamentos(eventoId, classificacaoId) {
+  let q = bd.from('lancamento')
+    .select('id, classificacao_id, tipo, descricao, fornecedor_id, valor, data_competencia, data_pagamento, forma_pagamento, documento_numero, observacoes, fornecedor:fornecedor_id(nome)')
+    .eq('evento_id', eventoId);
+  if (classificacaoId) q = q.eq('classificacao_id', classificacaoId);
+  const { data, error } = await q.order('data_pagamento', { ascending: false, nullsFirst: false });
+  if (error) throw new Error(traduzErro(error.message));
+  return data || [];
+}
+
+export async function salvarLancamento(eventoId, id, dados) {
+  let fornecedor_id = dados.fornecedor_id || null;
+  if (!fornecedor_id && (dados.fornecedor_nome || '').trim()) {
+    fornecedor_id = await fornecedorPorNome(empresaAtual()?.id, dados.fornecedor_nome);
+  }
+  const linha = {
+    classificacao_id: dados.classificacao_id || null,
+    tipo: dados.tipo || 'despesa',
+    descricao: (dados.descricao || '').trim() || null,
+    fornecedor_id,
+    valor: Number(dados.valor) || 0,
+    data_competencia: dados.data_competencia || null,
+    data_pagamento: dados.data_pagamento || null,
+    forma_pagamento: dados.forma_pagamento || null,
+    documento_numero: (dados.documento_numero || '').trim() || null,
+    observacoes: (dados.observacoes || '').trim() || null,
+  };
+  const q = id
+    ? bd.from('lancamento').update(linha).eq('id', id)
+    : bd.from('lancamento').insert({ ...linha, evento_id: eventoId, criado_por: sessao.usuario?.id || null });
+  const { data, error } = await q.select().single();
+  if (error) throw new Error(traduzErro(error.message));
+  return data;
+}
+
+export async function apagarLancamento(id) {
+  const { error } = await bd.from('lancamento').delete().eq('id', id);
+  if (error) throw new Error(traduzErro(error.message));
+}
+
 /** Grava vários itens de uma vez. Usado pela importação. */
 export async function criarItensEmLote(eventoId, linhas) {
   const prontos = linhas.map(l => ({
