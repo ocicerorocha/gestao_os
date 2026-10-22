@@ -5,6 +5,7 @@
 import { buscarEvento, listarItens, minhaPermissao, andamentoItens, listarReceitas, encerrarEvento, apagarEvento } from './nucleo.js';
 import { esc, aviso, moeda, numero, periodo, dataBR, iniciais, SITUACAO_EVENTO, registrarView } from './ui.js';
 import { abaProducao } from './producao.js';
+import { abaClassificacao } from './classificacao.js';
 import { abaSolicitacoes, abaAprovacoes } from './solicitacoes.js';
 import { abaReceitas } from './receitas.js';
 
@@ -12,6 +13,7 @@ export const contexto = { evento: null, permissao: null, itens: [], aba: 'painel
 
 const ABAS = [
   { id: 'painel',       rotulo: 'Painel' },
+  { id: 'classificacao', rotulo: 'Classificação' },
   { id: 'producao',     rotulo: 'Descritivo' },
   { id: 'solicitacoes', rotulo: 'Solicitações' },
   { id: 'aprovacoes',   rotulo: 'Aprovações', perm: 'aprovar_pagamento' },
@@ -112,6 +114,7 @@ function desenhar() {
 
   const corpo = alvo.querySelector('#aba-conteudo');
   if (contexto.aba === 'producao')          abaProducao(corpo);
+  else if (contexto.aba === 'classificacao') abaClassificacao(corpo);
   else if (contexto.aba === 'solicitacoes') abaSolicitacoes(corpo);
   else if (contexto.aba === 'aprovacoes')   abaAprovacoes(corpo);
   else if (contexto.aba === 'receitas')     abaReceitas(corpo);

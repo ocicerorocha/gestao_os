@@ -616,6 +616,69 @@ export async function salvarCotacoes(empresaId, itemId, linhas, escolhida) {
   return listarCotacoes(itemId);
 }
 
+/* ── classificação financeira (árvore de rubricas por contrato) ── */
+
+/** Árvore de classificação do contrato, em ordem. */
+export async function listarClassificacao(eventoId) {
+  if (!eventoId) return [];
+  const { data, error } = await bd
+    .from('classificacao')
+    .select('id, codigo, nome, tipo, nivel, eh_grupo, qtde, valor_mes, valor_orcado, ordem')
+    .eq('evento_id', eventoId)
+    .order('ordem', { ascending: true });
+  if (error) throw new Error(traduzErro(error.message));
+  return data || [];
+}
+
+/**
+ * Importa a árvore inteira (substitui a atual do contrato).
+ * `nos` = [{codigo, nome, nivel, eh_grupo, qtde, valor_mes, valor_orcado}] já na ordem.
+ */
+export async function importarClassificacao(eventoId, nos) {
+  await bd.from('classificacao').delete().eq('evento_id', eventoId);
+  const linhas = (nos || []).map((n, i) => ({
+    evento_id: eventoId,
+    codigo: (n.codigo || '').trim() || null,
+    nome: (n.nome || '').trim() || '(sem nome)',
+    tipo: 'despesa',
+    nivel: Number(n.nivel) || 0,
+    eh_grupo: !!n.eh_grupo,
+    qtde: (n.qtde === '' || n.qtde == null) ? null : Number(n.qtde),
+    valor_mes: (n.valor_mes === '' || n.valor_mes == null) ? null : Number(n.valor_mes),
+    valor_orcado: (n.valor_orcado === '' || n.valor_orcado == null) ? null : Number(n.valor_orcado),
+    ordem: i + 1,
+  }));
+  for (let i = 0; i < linhas.length; i += 200) {
+    const { error } = await bd.from('classificacao').insert(linhas.slice(i, i + 200));
+    if (error) throw new Error(traduzErro(error.message));
+  }
+  return listarClassificacao(eventoId);
+}
+
+/** Cria/edita um nó da árvore (grupo ou item). */
+export async function salvarNoClassificacao(eventoId, id, dados) {
+  const linha = {
+    codigo: (dados.codigo || '').trim() || null,
+    nome: (dados.nome || '').trim(),
+    nivel: Number(dados.nivel) || 0,
+    eh_grupo: !!dados.eh_grupo,
+    qtde: (dados.qtde === '' || dados.qtde == null) ? null : Number(dados.qtde),
+    valor_mes: (dados.valor_mes === '' || dados.valor_mes == null) ? null : Number(dados.valor_mes),
+    valor_orcado: (dados.valor_orcado === '' || dados.valor_orcado == null) ? null : Number(dados.valor_orcado),
+  };
+  const q = id
+    ? bd.from('classificacao').update(linha).eq('id', id)
+    : bd.from('classificacao').insert({ ...linha, evento_id: eventoId, tipo: 'despesa', ordem: dados.ordem ?? 9999 });
+  const { data, error } = await q.select().single();
+  if (error) throw new Error(traduzErro(error.message));
+  return data;
+}
+
+export async function apagarNoClassificacao(id) {
+  const { error } = await bd.from('classificacao').delete().eq('id', id);
+  if (error) throw new Error(traduzErro(error.message));
+}
+
 /** Grava vários itens de uma vez. Usado pela importação. */
 export async function criarItensEmLote(eventoId, linhas) {
   const prontos = linhas.map(l => ({
