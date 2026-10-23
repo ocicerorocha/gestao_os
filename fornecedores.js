@@ -9,7 +9,7 @@
 // ═══════════════════════════════════════════════════════
 
 import {
-  sessao, listarFornecedores, salvarFornecedor, alternarFornecedor,
+  sessao, listarFornecedores, salvarFornecedor, alternarFornecedor, consultarCNPJ,
   listarMeiosPagamento, salvarMeioPagamento,
 } from './nucleo.js';
 import { esc, aviso, abrirModal, fecharModal, comBotao, dataBR } from './ui.js';
@@ -35,7 +35,7 @@ export async function telaFornecedores() {
   }
 
   const filtrada = _busca
-    ? lista.filter(f => (f.nome + ' ' + (f.documento || '')).toLowerCase().includes(_busca.toLowerCase()))
+    ? lista.filter(f => (f.nome + ' ' + (f.apelido || '') + ' ' + (f.nome_fantasia || '') + ' ' + (f.documento || '')).toLowerCase().includes(_busca.toLowerCase()))
     : lista;
 
   alvo.innerHTML = `
@@ -53,7 +53,8 @@ export async function telaFornecedores() {
           <div class="linha-lista">
             <div style="min-width:0;flex:1">
               <div style="font-weight:500;font-size:14px">
-                ${esc(f.nome)}
+                ${esc(f.apelido || f.nome)}
+                ${f.apelido ? `<span style="color:var(--texto-3);font-weight:400;font-size:12px">· ${esc(f.nome)}</span>` : ''}
                 ${f.ativo ? '' : '<span class="etiqueta etiqueta-neutra" style="margin-left:6px">inativo</span>'}
               </div>
               <div style="font-size:12px;color:var(--texto-2)">
@@ -102,28 +103,40 @@ function modalFornecedor(f) {
   abrirModal(edicao ? 'Editar fornecedor' : 'Novo fornecedor', `
     <form id="ff">
       <div class="campo">
-        <label for="f-nome">Nome</label>
-        <input class="controle" id="f-nome" value="${esc(f.nome || '')}" placeholder="A Organização Ltda" required>
+        <label for="f-doc">CNPJ ou CPF</label>
+        <div style="display:flex;gap:8px">
+          <input class="controle" id="f-doc" value="${esc(f.documento || '')}" inputmode="numeric" placeholder="Só os números">
+          <button type="button" class="botao" id="f-buscar" style="white-space:nowrap">Buscar CNPJ</button>
+        </div>
+        <div class="dica">Digite o CNPJ e clique em Buscar — o sistema preenche razão social e nome fantasia pela Receita.</div>
+      </div>
+      <div class="campo">
+        <label for="f-nome">Razão social / Nome</label>
+        <input class="controle" id="f-nome" value="${esc(f.nome || '')}" required>
       </div>
       <div class="linha linha-2">
         <div class="campo">
-          <label for="f-doc">CNPJ ou CPF</label>
-          <input class="controle" id="f-doc" value="${esc(f.documento || '')}" inputmode="numeric">
+          <label for="f-fantasia">Nome fantasia</label>
+          <input class="controle" id="f-fantasia" value="${esc(f.nome_fantasia || '')}">
         </div>
+        <div class="campo">
+          <label for="f-apelido">Apelido (como vocês chamam)</label>
+          <input class="controle" id="f-apelido" value="${esc(f.apelido || '')}" placeholder="Ex.: FH Fisio / Bárbara">
+        </div>
+      </div>
+      <div class="linha linha-2">
         <div class="campo">
           <label for="f-contato">Pessoa de contato</label>
           <input class="controle" id="f-contato" value="${esc(f.contato || '')}">
-        </div>
-      </div>
-      <div class="linha linha-2">
-        <div class="campo">
-          <label for="f-email">Email</label>
-          <input class="controle" type="email" id="f-email" value="${esc(f.email || '')}">
         </div>
         <div class="campo">
           <label for="f-tel">Telefone</label>
           <input class="controle" id="f-tel" value="${esc(f.telefone || '')}" inputmode="tel">
         </div>
+      </div>
+      <div class="campo">
+        <label for="f-email">Email</label>
+        <input class="controle" type="email" id="f-email" value="${esc(f.email || '')}">
       </div>
       <div class="campo">
         <label for="f-obs">Observações</label>
@@ -138,6 +151,18 @@ function modalFornecedor(f) {
 
   const q = s => document.querySelector(s);
   q('#f-cancelar').addEventListener('click', fecharModal);
+  q('#f-buscar').addEventListener('click', async () => {
+    await comBotao(q('#f-buscar'), async () => {
+      try {
+        const d = await consultarCNPJ(q('#f-doc').value);
+        if (d.razao_social) q('#f-nome').value = d.razao_social;
+        if (d.nome_fantasia) q('#f-fantasia').value = d.nome_fantasia;
+        if (d.email && !q('#f-email').value.trim()) q('#f-email').value = d.email;
+        if (d.telefone && !q('#f-tel').value.trim()) q('#f-tel').value = d.telefone;
+        aviso('Dados preenchidos pela Receita.');
+      } catch (err) { aviso(err.message, 'erro'); }
+    });
+  });
   q('#ff').addEventListener('submit', async e => {
     e.preventDefault();
     const nome = q('#f-nome').value.trim();
@@ -145,7 +170,8 @@ function modalFornecedor(f) {
     await comBotao(q('#f-salvar'), async () => {
       try {
         await salvarFornecedor(_empresa.id, f.id || null, {
-          nome, documento: q('#f-doc').value, contato: q('#f-contato').value,
+          nome, apelido: q('#f-apelido').value, nome_fantasia: q('#f-fantasia').value,
+          documento: q('#f-doc').value, contato: q('#f-contato').value,
           email: q('#f-email').value, telefone: q('#f-tel').value, observacoes: q('#f-obs').value,
         });
         aviso(f.id ? 'Fornecedor atualizado.' : 'Fornecedor cadastrado.');

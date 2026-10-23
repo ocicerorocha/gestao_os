@@ -19,9 +19,17 @@ import {
 } from './ui.js';
 
 let _alvo = null;
+let _nos = [];
 let _realizado = {};   // classificacao_id -> soma dos lançamentos
 let _forns = null;     // cache de fornecedores (datalist)
+const _colapsados = new Set();   // códigos de grupo recolhidos
 const recarregar = () => _alvo && abaClassificacao(_alvo);
+
+// linha oculta porque algum grupo-pai está recolhido
+function ocultoPorColapso(n) {
+  const cod = n.codigo || '';
+  return [..._colapsados].some(c => cod !== c && cod.startsWith(c + '.'));
+}
 
 export async function abaClassificacao(alvo) {
   _alvo = alvo;
@@ -74,16 +82,21 @@ function pintar(alvo, nos) {
   const grandOrc = nos.filter(n => !n.eh_grupo).reduce((a, n) => a + Number(n.valor_orcado || 0), 0);
   const grandReal = Object.values(_realizado).reduce((a, v) => a + Number(v || 0), 0);
 
-  const linhas = nos.map(n => {
+  _nos = nos;
+  const linhas = nos.filter(n => !ocultoPorColapso(n)).map(n => {
     const ind = (n.nivel || 0) * 18;
     const cod = n.codigo ? `<span style="color:var(--texto-3);font-weight:500">${esc(n.codigo)}</span> ` : '';
     if (n.eh_grupo) {
-      return `<div class="cl-linha" data-id="${esc(n.id)}" style="padding:8px;margin-left:${ind}px;display:flex;justify-content:space-between;gap:10px;font-weight:600;border-top:1px solid var(--borda);cursor:pointer">
-        <span>${cod}${esc(n.nome)}</span>${parValores(subtotalReal(nos, n), subtotalOrcado(nos, n))}</div>`;
+      const aberto = !_colapsados.has(n.codigo);
+      const chev = `<span style="display:inline-block;width:15px;color:var(--texto-3)">${aberto ? '▾' : '▸'}</span>`;
+      const lapis = podeEditar ? `<button type="button" class="cl-edit botao-icone" data-id="${esc(n.id)}" title="Editar grupo" style="font-size:13px;opacity:.6">&#9998;</button>` : '';
+      return `<div class="cl-grupo" data-cod="${esc(n.codigo || '')}" style="padding:8px;margin-left:${ind}px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-weight:600;border-top:1px solid var(--borda);cursor:pointer">
+        <span style="min-width:0">${chev}${cod}${esc(n.nome)}</span>
+        <span style="display:flex;align-items:center;gap:8px;white-space:nowrap">${lapis}${parValores(subtotalReal(nos, n), subtotalOrcado(nos, n))}</span></div>`;
     }
     const q = n.qtde ? ` <span style="color:var(--texto-3);font-size:12px">· qtde ${numero(n.qtde)}</span>` : '';
-    return `<div class="cl-linha" data-id="${esc(n.id)}" style="padding:6px 8px;margin-left:${ind}px;display:flex;justify-content:space-between;gap:10px;cursor:pointer">
-      <span>${cod}${esc(n.nome)}${q}</span>${parValores(Number(_realizado[n.id] || 0), Number(n.valor_orcado || 0))}</div>`;
+    return `<div class="cl-item" data-id="${esc(n.id)}" style="padding:6px 8px;margin-left:${ind + 15}px;display:flex;justify-content:space-between;gap:10px;cursor:pointer">
+      <span style="min-width:0">${cod}${esc(n.nome)}${q}</span>${parValores(Number(_realizado[n.id] || 0), Number(n.valor_orcado || 0))}</div>`;
   }).join('');
 
   alvo.innerHTML = `
@@ -99,7 +112,7 @@ function pintar(alvo, nos) {
       </div>` : ''}
     </div>
     ${nos.length ? `<div class="cartao" style="padding:2px">${linhas}</div>
-      <div class="dica" style="margin-top:8px">Clique num <b>item</b> para ver o detalhe e lançar despesas; num <b>grupo</b> para editar.</div>` : `
+      <div class="dica" style="margin-top:8px">Clique num <b>item</b> para ver o detalhe e lançar despesas; num <b>grupo</b> para recolher/expandir (lápis edita).</div>` : `
       <div class="vazio">
         <h3>Sem classificação ainda</h3>
         <p>Importe a planilha de classificação financeira do contrato (Quadro Orçamentário Analítico) para montar a árvore de rubricas.</p>
@@ -116,12 +129,21 @@ function pintar(alvo, nos) {
     if (f) await importarPlanilha(f, alvo);
   });
   q('#cl-novo')?.addEventListener('click', () => modalNo(null));
-  alvo.querySelectorAll('.cl-linha').forEach(el =>
-    el.addEventListener('click', () => {
-      const no = nos.find(n => String(n.id) === el.dataset.id);
-      if (!no) return;
-      if (no.eh_grupo) modalNo(no); else detalheRubrica(no);
-    }));
+  alvo.querySelectorAll('.cl-grupo').forEach(el => el.addEventListener('click', () => {
+    const cod = el.dataset.cod;
+    if (!cod) return;
+    if (_colapsados.has(cod)) _colapsados.delete(cod); else _colapsados.add(cod);
+    pintar(alvo, _nos);
+  }));
+  alvo.querySelectorAll('.cl-edit').forEach(el => el.addEventListener('click', e => {
+    e.stopPropagation();
+    const no = _nos.find(n => String(n.id) === el.dataset.id);
+    if (no) modalNo(no);
+  }));
+  alvo.querySelectorAll('.cl-item').forEach(el => el.addEventListener('click', () => {
+    const no = _nos.find(n => String(n.id) === el.dataset.id);
+    if (no) detalheRubrica(no);
+  }));
 }
 
 /* ── importação da planilha (Quadro Analítico) ────────── */

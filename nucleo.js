@@ -416,7 +416,7 @@ export async function removerPermissao(eventoId, usuarioId) {
 export async function listarFornecedores(empresaId) {
   const { data, error } = await bd
     .from('fornecedor')
-    .select('id, nome, documento, contato, email, telefone, observacoes, ativo')
+    .select('id, nome, apelido, nome_fantasia, documento, contato, email, telefone, observacoes, ativo')
     .eq('empresa_id', empresaId)
     .order('nome');
   if (error) throw error;
@@ -426,6 +426,8 @@ export async function listarFornecedores(empresaId) {
 export async function salvarFornecedor(empresaId, id, dados) {
   const linha = {
     nome: dados.nome?.trim(),
+    apelido: dados.apelido?.trim() || null,
+    nome_fantasia: dados.nome_fantasia?.trim() || null,
     documento: dados.documento?.trim() || null,
     contato: dados.contato?.trim() || null,
     email: dados.email?.trim() || null,
@@ -438,6 +440,25 @@ export async function salvarFornecedor(empresaId, id, dados) {
   const { data, error } = await q.select().single();
   if (error) throw new Error(traduzErro(error.message));
   return data;
+}
+
+/** Consulta dados públicos de um CNPJ na Receita (via BrasilAPI). */
+export async function consultarCNPJ(cnpj) {
+  const limpo = (cnpj || '').replace(/\D/g, '');
+  if (limpo.length !== 14) throw new Error('O CNPJ precisa ter 14 dígitos.');
+  let r;
+  try { r = await fetch('https://brasilapi.com.br/api/cnpj/v1/' + limpo); }
+  catch (_) { throw new Error('Não consegui acessar a consulta de CNPJ agora.'); }
+  if (!r.ok) throw new Error(r.status === 404 ? 'CNPJ não encontrado na Receita.' : 'A consulta de CNPJ falhou. Tente de novo.');
+  const d = await r.json();
+  const tel = (d.ddd_telefone_1 || '').replace(/\D/g, '');
+  return {
+    razao_social: d.razao_social || '',
+    nome_fantasia: d.nome_fantasia || '',
+    email: (d.email || '').toLowerCase(),
+    telefone: tel ? tel.replace(/^(\d{2})(\d{4,5})(\d{4})$/, '($1) $2-$3') : '',
+    municipio: d.municipio || '', uf: d.uf || '',
+  };
 }
 
 export async function alternarFornecedor(id, ativo) {
