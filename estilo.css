@@ -716,20 +716,44 @@ body.menu-aberto .topo { z-index: 60; }
 .lateral .marca{ font-size:18px; font-weight:700; letter-spacing:-.01em; }
 .lateral .topo-empresa{ max-width:none; }
 .lateral .topo-empresa .nome{ display:inline; }
+.topo-linha{ display:flex; align-items:center; gap:8px; }
+.topo-linha .marca{ flex:1; min-width:0; }
+.olho-btn{ background:none; border:none; cursor:pointer; color:var(--texto-3); display:flex; align-items:center; padding:5px; border-radius:var(--raio); flex-shrink:0; }
+.olho-btn:hover{ background:var(--superficie-2); color:var(--texto-2); }
 .lateral-nav{ display:flex; flex-direction:column; gap:2px; flex:1; }
 .nav-grupo{
   font-size:11px; letter-spacing:.07em; text-transform:uppercase;
   color:var(--texto-3); font-weight:600; padding:14px 12px 4px;
 }
+/* grupo recolhível */
+.nav-grupo-bloco{ display:flex; flex-direction:column; }
+.nav-grupo-btn{
+  display:flex; align-items:center; gap:6px; width:100%;
+  background:none; border:none; cursor:pointer; font-family:inherit;
+  font-size:11px; letter-spacing:.07em; text-transform:uppercase;
+  color:var(--texto-3); font-weight:600; padding:14px 12px 4px;
+}
+.nav-grupo-btn span{ flex:1; text-align:left; }
+.nav-grupo-btn .chev{ transition:transform .18s ease; }
+.nav-grupo-bloco.aberto .nav-grupo-btn .chev{ transform:rotate(90deg); }
+.nav-grupo-itens{ display:none; flex-direction:column; gap:2px; }
+.nav-grupo-bloco.aberto .nav-grupo-itens{ display:flex; }
 .lateral .nav-item{ width:100%; text-align:left; padding:9px 12px; font-size:14px; }
 .lateral .nav-sub{ padding-left:22px; }
 .lateral-rodape{
   display:flex; align-items:center; gap:10px;
   padding:12px 6px 2px; border-top:1px solid var(--borda);
 }
-.rodape-btn{ background:none; border:none; cursor:pointer; color:var(--texto-2); display:flex; align-items:center; padding:6px; border-radius:var(--raio); }
-.rodape-btn:hover{ background:var(--superficie-2); }
-.lateral-rodape .avatar{ margin-left:auto; }
+.lateral-rodape .rodape-nome{
+  flex:1; min-width:0; font-size:13px; color:var(--texto-2);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.rodape-sair{
+  background:none; border:1px solid var(--borda-forte); cursor:pointer;
+  color:var(--texto-2); font-family:inherit; font-size:13px; font-weight:500;
+  padding:6px 14px; border-radius:var(--raio); flex-shrink:0;
+}
+.rodape-sair:hover{ background:var(--superficie-2); color:var(--texto); }
 
 .conteudo{ flex:1; min-width:0; max-width:1080px; margin:0 auto; padding:24px 22px 64px; }
 
