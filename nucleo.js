@@ -860,14 +860,19 @@ export async function resumoContratosOS(empresaId) {
   if (e1) throw new Error(traduzErro(e1.message));
   const ids = (evs || []).map(e => e.id);
   const porContrato = {};
-  (evs || []).forEach(e => { porContrato[e.id] = { ...e, orcado: 0, realizado: 0 }; });
+  (evs || []).forEach(e => { porContrato[e.id] = { ...e, orcado: 0, realizado: 0, pago: 0, a_pagar: 0 }; });
   if (ids.length) {
     const [{ data: cls }, { data: lcs }] = await Promise.all([
       bd.from('classificacao').select('evento_id, valor_orcado, eh_grupo').in('evento_id', ids),
-      bd.from('lancamento').select('evento_id, valor').in('evento_id', ids),
+      bd.from('lancamento').select('evento_id, valor, data_pagamento').in('evento_id', ids),
     ]);
     (cls || []).forEach(c => { if (!c.eh_grupo && porContrato[c.evento_id]) porContrato[c.evento_id].orcado += Number(c.valor_orcado || 0); });
-    (lcs || []).forEach(l => { if (porContrato[l.evento_id]) porContrato[l.evento_id].realizado += Number(l.valor || 0); });
+    (lcs || []).forEach(l => {
+      const c = porContrato[l.evento_id]; if (!c) return;
+      const v = Number(l.valor || 0);
+      c.realizado += v;                       // comprometido = pago + a pagar
+      if (l.data_pagamento) c.pago += v; else c.a_pagar += v;
+    });
   }
   return Object.values(porContrato);
 }
