@@ -118,6 +118,7 @@ function pintar(alvo, nos) {
         <input type="file" id="cl-arquivo" accept=".xlsx,.xls" style="display:none">
         <button class="botao" id="cl-importar">Importar planilha</button>
         <button class="botao" id="cl-novo">Adicionar linha</button>
+        ${nos.some(n => !n.eh_grupo) ? `<button class="botao botao-primario" id="cl-lancar">Adicionar lançamento</button>` : ''}
       </div>` : ''}
     </div>
     ${nos.length ? `<div class="cartao" style="padding:2px">${linhas}</div>
@@ -138,6 +139,7 @@ function pintar(alvo, nos) {
     if (f) await importarPlanilha(f, alvo);
   });
   q('#cl-novo')?.addEventListener('click', () => modalNo(null));
+  q('#cl-lancar')?.addEventListener('click', () => modalLancamento(null, null));
   alvo.querySelectorAll('.cl-grupo').forEach(el => el.addEventListener('click', () => {
     const cod = el.dataset.cod;
     if (!cod) return;
@@ -323,9 +325,25 @@ async function modalLancamento(no, lanc) {
   if (cotEscolhida < 0) cotEscolhida = null;
   const temCot = cotExist.length > 0;
   const FORMAS = ['Boleto', 'Pix', 'Transferência', 'Dinheiro', 'Cartão', 'Outro'];
+  const hoje = new Date().toISOString().slice(0, 10);
+
+  // sem rubrica definida (veio do botão "Adicionar lançamento"): mostra seletor
+  const folhas = (_nos || []).filter(n => !n.eh_grupo);
+  const semRubrica = !no;
+  // situação inicial: ao editar, "pago" se já tem data de pagamento; ao criar, "pago"
+  const pagoInicial = ed ? !!l.data_pagamento : true;
+  const voltar = () => { if (no) detalheRubrica(no); else { fecharModal(); recarregar(); } };
 
   abrirModal(ed ? 'Editar lançamento' : 'Novo lançamento', `
     <form id="flan">
+      ${semRubrica ? `
+      <div class="campo">
+        <label for="l-rubrica">Rubrica (classificação)</label>
+        <select class="controle" id="l-rubrica" required>
+          <option value="">— escolha a rubrica —</option>
+          ${folhas.map(f => `<option value="${esc(f.id)}">${esc(f.codigo ? f.codigo + ' · ' : '')}${esc(f.nome)}</option>`).join('')}
+        </select>
+      </div>` : ''}
       <div class="campo">
         <label for="l-forn">Fornecedor</label>
         <input class="controle" id="l-forn" list="l-forns" value="${esc(l.fornecedor?.nome || '')}" placeholder="Nome do fornecedor">
@@ -345,10 +363,21 @@ async function modalLancamento(no, lanc) {
           <input class="controle" type="date" id="l-emis" value="${esc((l.data_competencia || '').slice(0, 10))}">
         </div>
       </div>
+      <div class="campo">
+        <label>Situação</label>
+        <div class="segmentos" id="l-sit">
+          <button type="button" class="seg ${pagoInicial ? 'ativo' : ''}" data-sit="pago">Já paguei</button>
+          <button type="button" class="seg ${pagoInicial ? '' : 'ativo'}" data-sit="programar">A pagar</button>
+        </div>
+      </div>
       <div class="linha linha-2">
-        <div class="campo">
-          <label for="l-pgto">Data de pagamento</label>
-          <input class="controle" type="date" id="l-pgto" value="${esc((l.data_pagamento || '').slice(0, 10))}">
+        <div class="campo" id="l-bloco-pago" ${pagoInicial ? '' : 'hidden'}>
+          <label for="l-pgto">Data do pagamento</label>
+          <input class="controle" type="date" id="l-pgto" value="${esc((l.data_pagamento || '').slice(0, 10)) || hoje}">
+        </div>
+        <div class="campo" id="l-bloco-prog" ${pagoInicial ? 'hidden' : ''}>
+          <label for="l-venc">Previsão de pagamento</label>
+          <input class="controle" type="date" id="l-venc" value="${esc((l.data_vencimento || '').slice(0, 10))}">
         </div>
         <div class="campo">
           <label for="l-forma">Forma de pagamento</label>
@@ -423,22 +452,38 @@ async function modalLancamento(no, lanc) {
     });
   });
 
-  q('#l-cancelar').addEventListener('click', () => detalheRubrica(no));
+  // situação: alterna entre "já paguei" (data do pagamento) e "a pagar" (previsão)
+  let sit = pagoInicial ? 'pago' : 'programar';
+  q('#l-sit').querySelectorAll('.seg').forEach(btn => {
+    btn.addEventListener('click', () => {
+      sit = btn.dataset.sit;
+      q('#l-sit').querySelectorAll('.seg').forEach(b => b.classList.toggle('ativo', b.dataset.sit === sit));
+      q('#l-bloco-pago').hidden = sit !== 'pago';
+      q('#l-bloco-prog').hidden = sit === 'pago';
+    });
+  });
+
+  q('#l-cancelar').addEventListener('click', voltar);
   q('#l-apagar')?.addEventListener('click', async () => {
     if (!confirm('Apagar este lançamento?')) return;
-    try { await apagarLancamento(l.id); aviso('Removido.'); detalheRubrica(no); }
+    try { await apagarLancamento(l.id); aviso('Removido.'); voltar(); }
     catch (e) { aviso(e.message, 'erro'); }
   });
   q('#flan').addEventListener('submit', async e => {
     e.preventDefault();
+    const classificacaoId = no ? no.id : q('#l-rubrica')?.value;
+    if (!classificacaoId) return aviso('Escolha a rubrica.', 'aviso');
     const valor = lerMoeda(q('#l-valor'));
     if (!valor) return aviso('Informe o valor.', 'aviso');
+    const pago = sit === 'pago';
     await comBotao(q('#l-salvar'), async () => {
       try {
         const salvo = await salvarLancamento(contexto.evento.id, l.id || null, {
-          classificacao_id: no.id, tipo: 'despesa',
+          classificacao_id: classificacaoId, tipo: 'despesa',
           fornecedor_nome: q('#l-forn').value, descricao: q('#l-desc').value,
-          valor, data_competencia: q('#l-emis').value || null, data_pagamento: q('#l-pgto').value || null,
+          valor, data_competencia: q('#l-emis').value || null,
+          data_pagamento: pago ? (q('#l-pgto').value || hoje) : null,
+          data_vencimento: pago ? null : (q('#l-venc').value || null),
           forma_pagamento: q('#l-forma').value || null, documento_numero: q('#l-doc').value,
           observacoes: q('#l-obs').value,
         });
@@ -448,8 +493,8 @@ async function modalLancamento(no, lanc) {
         });
         try { await salvarCotacoesLanc(empresaAtual().id, salvo.id, cot, escolhida); }
         catch (err) { aviso('Lançamento salvo, mas as cotações falharam: ' + err.message, 'aviso', 8000); }
-        aviso(ed ? 'Salvo.' : 'Lançamento adicionado.');
-        detalheRubrica(no);
+        aviso(pago ? 'Lançamento salvo (pago).' : 'Lançamento salvo (a pagar).');
+        voltar();
       } catch (err) { aviso(err.message, 'erro'); }
     });
   });
