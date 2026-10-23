@@ -138,7 +138,7 @@ function desenhar(alvo) {
 
 function cartao(l, vencido) {
   return `
-    <div class="pag-cartao ${vencido ? 'vencido' : ''}">
+    <div class="pag-cartao ${vencido ? 'vencido' : ''}" data-detalhe="${esc(l.id)}" style="cursor:pointer">
       <span class="marca"></span>
       <div style="flex:1;min-width:0">
         <div style="font-weight:500">${esc(desc(l))}</div>
@@ -182,7 +182,7 @@ function renderPagos(alvo) {
         <p>Lançamentos marcados como pagos aparecem aqui${_filtroEvento ? ' para este contrato' : ''}.</p></div>` : `
       <div class="cartao" style="padding:0;overflow:hidden">
         ${pagos.map(p => `
-          <div class="linha-lista">
+          <div class="linha-lista" data-detalhe="${esc(p.id)}" style="cursor:pointer">
             <div style="flex:1;min-width:0">
               <div style="font-weight:500;font-size:14px">${esc(desc(p))}</div>
               <div style="font-size:12px;color:var(--texto-2)">
@@ -204,14 +204,62 @@ function ligarEventos(alvo) {
   alvo.querySelectorAll('[data-aba]').forEach(b =>
     b.addEventListener('click', () => { _aba = b.dataset.aba; desenhar(alvo); }));
   alvo.querySelector('#f-evento')?.addEventListener('change', e => { _filtroEvento = e.target.value; desenhar(alvo); });
+  alvo.querySelectorAll('[data-detalhe]').forEach(el =>
+    el.addEventListener('click', () => modalDetalhe(el.dataset.detalhe)));
   alvo.querySelectorAll('[data-pagar]').forEach(b =>
-    b.addEventListener('click', () => modalPagar(b.dataset.pagar)));
+    b.addEventListener('click', e => { e.stopPropagation(); modalPagar(b.dataset.pagar); }));
   alvo.querySelectorAll('[data-reabrir]').forEach(b =>
-    b.addEventListener('click', async () => {
+    b.addEventListener('click', async e => {
+      e.stopPropagation();
       if (!confirm('Reabrir este lançamento? Ele volta para "A pagar".')) return;
       try { await reabrirLancamento(b.dataset.reabrir); aviso('Reaberto.'); await telaPagamentos(); }
-      catch (e) { aviso(e.message, 'erro'); }
+      catch (e2) { aviso(e2.message, 'erro'); }
     }));
+}
+
+function linhaInfo(rotulo, valor) {
+  if (valor == null || valor === '') return '';
+  return `<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-top:1px solid var(--borda);font-size:13px">
+    <span style="color:var(--texto-2)">${esc(rotulo)}</span>
+    <span style="text-align:right;min-width:0">${esc(valor)}</span></div>`;
+}
+
+function modalDetalhe(id) {
+  const l = _lancs.find(x => x.id === id);
+  if (!l) return;
+  const pago = !!l.data_pagamento;
+  abrirModal('Detalhe do lançamento', `
+    <div style="margin-bottom:12px">
+      <div style="font-weight:600;font-size:16px">${esc(desc(l))}</div>
+      <div style="font-size:22px;font-weight:700;margin-top:4px;color:${pago ? 'var(--verde)' : 'var(--texto)'}">${moeda(l.valor)}</div>
+      <span class="etiqueta ${pago ? 'etiqueta-verde' : 'etiqueta-ambar'}" style="margin-top:6px;display:inline-block">${pago ? 'Pago' : 'A pagar'}</span>
+    </div>
+    <div style="margin-bottom:14px">
+      ${linhaInfo('Fornecedor', l.fornecedor?.nome)}
+      ${linhaInfo('Contrato', l.evento_nome)}
+      ${linhaInfo('Rubrica', l.classificacao ? (l.classificacao.codigo ? l.classificacao.codigo + ' · ' : '') + l.classificacao.nome : null)}
+      ${linhaInfo('Descrição', l.descricao)}
+      ${linhaInfo('Nº do documento / nota', l.documento_numero)}
+      ${linhaInfo('Forma de pagamento', l.forma_pagamento)}
+      ${linhaInfo('Emissão', l.data_competencia ? dataBR(l.data_competencia) : null)}
+      ${pago
+        ? linhaInfo('Data do pagamento', dataBR(l.data_pagamento))
+        : linhaInfo('Previsão de pagamento', l.data_vencimento ? dataBR(l.data_vencimento) : 'sem data')}
+    </div>
+    <div class="modal-acoes">
+      ${pago
+        ? `<button type="button" class="botao" id="d-reabrir" style="margin-right:auto">Reabrir (voltar p/ a pagar)</button>`
+        : `<button type="button" class="botao botao-primario" id="d-pagar" style="margin-right:auto">Marcar como pago</button>`}
+      <button type="button" class="botao" id="d-fechar">Fechar</button>
+    </div>`);
+  const q = s => document.querySelector(s);
+  q('#d-fechar').addEventListener('click', fecharModal);
+  q('#d-pagar')?.addEventListener('click', () => { fecharModal(); modalPagar(id); });
+  q('#d-reabrir')?.addEventListener('click', async () => {
+    if (!confirm('Reabrir este lançamento? Ele volta para "A pagar".')) return;
+    try { await reabrirLancamento(id); aviso('Reaberto.'); fecharModal(); await telaPagamentos(); }
+    catch (e) { aviso(e.message, 'erro'); }
+  });
 }
 
 function modalPagar(id) {
