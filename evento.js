@@ -193,23 +193,29 @@ async function abaPainel(alvo) {
     try { receitas = await listarReceitas(ev.id); } catch (e) { receitas = []; }
   }
 
-  // ── orçado (soma das folhas) e realizado (soma dos lançamentos) ──
+  // ── orçado (folhas) · realizado = comprometido (pago + a pagar) ──
   const folhas = nos.filter(n => !n.eh_grupo);
   const orcado = folhas.reduce((a, n) => a + Number(n.valor_orcado || 0), 0);
-  const realizado = lancs.reduce((a, l) => a + Number(l.valor || 0), 0);
+  const pago = lancs.filter(l => l.data_pagamento).reduce((a, l) => a + Number(l.valor || 0), 0);
+  const aPagar = lancs.filter(l => !l.data_pagamento).reduce((a, l) => a + Number(l.valor || 0), 0);
+  const realizado = pago + aPagar;            // comprometido
   const saldo = orcado - realizado;
-  const pctExec = orcado > 0 ? Math.round(realizado / orcado * 100) : 0;
+  const pctPago = orcado > 0 ? Math.round(pago / orcado * 100) : 0;
+  const pctAPagar = orcado > 0 ? Math.round(aPagar / orcado * 100) : 0;
+  const nLancPagos = lancs.filter(l => l.data_pagamento).length;
+  const nLancAPagar = lancs.length - nLancPagos;
 
   // ── por rubrica de topo (código sem ponto: A, B, C…) ──
-  const topo = {};   // codigoTopo -> { nome, orcado, realizado }
+  const topo = {};   // codigoTopo -> { nome, orcado, pago, aPagar }
   const nomeTopo = {};
   nos.forEach(n => {
     const t = (n.codigo || '').split('.')[0] || '—';
     if ((n.nivel || 0) === 0) nomeTopo[t] = n.nome;
   });
+  const novoTopo = t => ({ nome: nomeTopo[t] || (t === '—' ? 'Sem rubrica' : t), orcado: 0, pago: 0, aPagar: 0 });
   folhas.forEach(n => {
     const t = (n.codigo || '').split('.')[0] || '—';
-    if (!topo[t]) topo[t] = { nome: nomeTopo[t] || t, orcado: 0, realizado: 0 };
+    if (!topo[t]) topo[t] = novoTopo(t);
     topo[t].orcado += Number(n.valor_orcado || 0);
   });
   const folhaPorId = {};
@@ -217,8 +223,9 @@ async function abaPainel(alvo) {
   lancs.forEach(l => {
     const f = folhaPorId[l.classificacao_id];
     const t = f ? ((f.codigo || '').split('.')[0] || '—') : '—';
-    if (!topo[t]) topo[t] = { nome: nomeTopo[t] || 'Sem rubrica', orcado: 0, realizado: 0 };
-    topo[t].realizado += Number(l.valor || 0);
+    if (!topo[t]) topo[t] = novoTopo(t);
+    if (l.data_pagamento) topo[t].pago += Number(l.valor || 0);
+    else topo[t].aPagar += Number(l.valor || 0);
   });
   const rubricas = Object.entries(topo).sort((a, b) => b[1].orcado - a[1].orcado);
 
@@ -226,7 +233,7 @@ async function abaPainel(alvo) {
   const receitaPrevista = receitas.reduce((a, r) => a + Number(r.valor_previsto || 0), 0);
   const recebido = receitas.reduce((a, r) => a + Number(r.recebido || 0), 0);
   const resultadoPrevisto = receitaPrevista - orcado;
-  const resultadoReal = recebido - realizado;
+  const resultadoReal = recebido - pago;   // fluxo de caixa: recebido − efetivamente pago
   const aReceberEv = Math.max(receitaPrevista - recebido, 0);
   const podeEncerrar = contexto.permissao?.admin
     && ev.situacao !== 'encerrado'
@@ -258,10 +265,17 @@ async function abaPainel(alvo) {
         <div style="font-weight:600;font-size:12px;color:var(--texto-2);margin-bottom:10px;text-transform:uppercase;letter-spacing:.03em">Orçado × Realizado</div>
         <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
           <span>Orçado <b class="num">${moeda(orcado)}</b></span>
-          <span>Realizado <b class="num" style="color:var(--verde)">${moeda(realizado)}</b></span>
+          <span>Comprometido <b class="num" style="color:${realizado > orcado ? 'var(--vermelho)' : 'var(--texto)'}">${moeda(realizado)}</b></span>
         </div>
-        <div style="height:10px;border-radius:20px;background:var(--superficie-2);overflow:hidden"><div style="height:100%;width:${Math.min(100, pctExec)}%;background:${realizado > orcado ? 'var(--vermelho)' : 'var(--verde)'}"></div></div>
-        <div class="rotulo" style="margin-top:5px">${pctExec}% executado · saldo <b class="num" style="color:${saldo < 0 ? 'var(--vermelho)' : 'var(--texto)'}">${moeda(saldo)}</b></div>
+        <div style="display:flex;height:10px;border-radius:20px;background:var(--superficie-2);overflow:hidden">
+          <div style="height:100%;width:${Math.min(100, pctPago)}%;background:var(--verde)"></div>
+          <div style="height:100%;width:${Math.min(100 - Math.min(100, pctPago), pctAPagar)}%;background:var(--ambar)"></div>
+        </div>
+        <div class="rotulo" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px 14px">
+          <span>${pontinho('var(--verde)')}Pago <b class="num">${moeda(pago)}</b></span>
+          <span>${pontinho('var(--ambar)')}A pagar <b class="num">${moeda(aPagar)}</b></span>
+        </div>
+        <div class="rotulo" style="margin-top:4px">saldo sobre o orçado <b class="num" style="color:${saldo < 0 ? 'var(--vermelho)' : 'var(--texto)'}">${moeda(saldo)}</b></div>
       </div>
       ${podeVerReceitas ? `
       <div class="cartao">
@@ -279,7 +293,7 @@ async function abaPainel(alvo) {
           <div><div class="rotulo">Previsto</div><div style="font-weight:700;font-size:18px;color:${resultadoPrevisto >= 0 ? 'var(--verde)' : 'var(--vermelho)'}">${resultadoPrevisto >= 0 ? '+' : ''}${moeda(resultadoPrevisto)}</div></div>
           <div style="text-align:right"><div class="rotulo">Fluxo real</div><div style="font-weight:700;font-size:18px;color:${resultadoReal >= 0 ? 'var(--verde)' : 'var(--vermelho)'}">${resultadoReal >= 0 ? '+' : ''}${moeda(resultadoReal)}</div></div>
         </div>
-        <div class="rotulo" style="margin-top:6px">previsto = repasse − orçado · real = recebido − realizado</div>
+        <div class="rotulo" style="margin-top:6px">previsto = repasse − orçado · real = recebido − pago</div>
       </div>` : ''}
     </div>
 
@@ -300,35 +314,46 @@ async function abaPainel(alvo) {
         <div class="rotulo" style="margin-top:2px">${numero(folhas.length)} ${folhas.length === 1 ? 'rubrica' : 'rubricas'}</div>
       </div>
       <div class="metrica">
-        <div class="rotulo">Realizado</div>
-        <div class="valor" style="color:var(--verde)">${moeda(realizado)}</div>
-        <div class="rotulo" style="margin-top:2px">${numero(lancs.length)} ${lancs.length === 1 ? 'lançamento' : 'lançamentos'}</div>
+        <div class="rotulo">Pago</div>
+        <div class="valor" style="color:var(--verde)">${moeda(pago)}</div>
+        <div class="rotulo" style="margin-top:2px">${numero(nLancPagos)} ${nLancPagos === 1 ? 'lançamento' : 'lançamentos'}</div>
+      </div>
+      <div class="metrica">
+        <div class="rotulo">A pagar (programado)</div>
+        <div class="valor" style="color:${aPagar > 0 ? 'var(--ambar)' : 'var(--texto-2)'}">${moeda(aPagar)}</div>
+        <div class="rotulo" style="margin-top:2px">${numero(nLancAPagar)} ${nLancAPagar === 1 ? 'lançamento' : 'lançamentos'}</div>
       </div>
       <div class="metrica">
         <div class="rotulo">Saldo</div>
         <div class="valor" style="color:${saldo < 0 ? 'var(--vermelho)' : 'var(--verde)'}">${moeda(saldo)}</div>
-        <div class="rotulo" style="margin-top:2px">${saldo < 0 ? 'acima do orçado' : 'disponível'}</div>
+        <div class="rotulo" style="margin-top:2px">${saldo < 0 ? 'acima do orçado' : 'orçado − comprometido'}</div>
       </div>
     </div>
 
     <h2 style="font-size:15px;margin:24px 0 10px">Execução por rubrica <span class="rotulo" style="font-weight:400">· toque para abrir na Classificação</span></h2>
     <div class="cartao">
       ${rubricas.map(([cod, v]) => {
-        const p = v.orcado > 0 ? Math.round(v.realizado / v.orcado * 100) : (v.realizado > 0 ? 100 : 0);
-        const estouro = v.realizado > v.orcado + 0.005;
+        const comprometido = v.pago + v.aPagar;
+        const pctP = v.orcado > 0 ? Math.round(v.pago / v.orcado * 100) : (v.pago > 0 ? 100 : 0);
+        const pctA = v.orcado > 0 ? Math.round(v.aPagar / v.orcado * 100) : (v.aPagar > 0 ? 100 - pctP : 0);
+        const estouro = comprometido > v.orcado + 0.005;
         return `
         <div style="margin-bottom:14px;cursor:pointer" data-ir-classificacao="1">
           <div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;margin-bottom:4px">
             <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b style="color:var(--texto-3);font-weight:600;margin-right:4px">${esc(cod)}</b>${esc(v.nome)}</span>
-            <span style="white-space:nowrap"><span class="num" style="color:${estouro ? 'var(--vermelho)' : 'var(--verde)'};font-weight:500">${moeda(v.realizado)}</span> <span style="color:var(--texto-3)">/ ${moeda(v.orcado)}</span></span>
+            <span style="white-space:nowrap">
+              <span class="num" style="color:var(--verde);font-weight:500">${moeda(v.pago)}</span>${v.aPagar > 0.005 ? ` <span class="num" style="color:var(--ambar)">+${moeda(v.aPagar)}</span>` : ''} <span style="color:var(--texto-3)">/ ${moeda(v.orcado)}</span>${estouro ? ' <span style="color:var(--vermelho)">⚠</span>' : ''}
+            </span>
           </div>
-          <div style="height:8px;background:var(--superficie-2);border-radius:4px;overflow:hidden">
-            <div style="height:100%;width:${Math.min(100, p)}%;background:${estouro ? 'var(--vermelho)' : 'var(--verde)'}"></div>
+          <div style="display:flex;height:8px;background:var(--superficie-2);border-radius:4px;overflow:hidden">
+            <div style="height:100%;width:${Math.min(100, pctP)}%;background:var(--verde)"></div>
+            <div style="height:100%;width:${Math.min(100 - Math.min(100, pctP), pctA)}%;background:var(--ambar)"></div>
           </div>
         </div>`;
       }).join('')}
-      <div class="rotulo" style="margin-top:6px;display:flex;gap:16px;align-items:center">
-        <span>${pontinho('var(--verde)')}realizado</span>
+      <div class="rotulo" style="margin-top:6px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+        <span>${pontinho('var(--verde)')}pago</span>
+        <span>${pontinho('var(--ambar)')}a pagar</span>
         <span>${pontinho('var(--borda-forte)')}orçado</span>
       </div>
     </div>
