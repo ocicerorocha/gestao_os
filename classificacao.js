@@ -22,6 +22,7 @@ let _alvo = null;
 let _nos = [];
 let _realizado = {};   // classificacao_id -> soma dos lançamentos
 let _forns = null;     // cache de fornecedores (datalist)
+let _initContrato = null;        // contrato cuja árvore já teve o colapso inicial
 const _colapsados = new Set();   // códigos de grupo recolhidos
 const recarregar = () => _alvo && abaClassificacao(_alvo);
 
@@ -51,6 +52,12 @@ export async function abaClassificacao(alvo) {
   _realizado = {};
   for (const l of lancs) {
     if (l.classificacao_id) _realizado[l.classificacao_id] = (_realizado[l.classificacao_id] || 0) + Number(l.valor || 0);
+  }
+  // Na primeira abertura deste contrato, mostra a árvore recolhida.
+  if (_initContrato !== contexto.evento.id) {
+    _colapsados.clear();
+    for (const n of nos) if (n.eh_grupo && n.codigo) _colapsados.add(n.codigo);
+    _initContrato = contexto.evento.id;
   }
   pintar(alvo, nos);
 }

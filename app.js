@@ -62,15 +62,19 @@ async function entrarNoSistema() {
 
 /* ── estrutura interna ─────────────────────────────── */
 
-const SECOES = [
-  { id: 'painel', rotulo: 'Painel', tela: telaPainelEmpresa, perm: 'ver_painel' },
-  { id: 'eventos',      rotulo: 'Contratos',      tela: telaEventos,      sempre: true },
-  { id: 'pagamentos',   rotulo: 'Pagamentos',   tela: telaPagamentos,   pagador: true },
-  { id: 'documentos',   rotulo: 'Documentos',   tela: telaDocumentos,   sempre: true },
-  { id: 'fornecedores', rotulo: 'Fornecedores', tela: telaFornecedores, perm: 'gerir_fornecedores' },
-  { id: 'usuarios',     rotulo: 'Usuários',     tela: telaUsuarios,     perm: 'gerir_usuarios' },
-  { id: 'produtora',    rotulo: 'Organização',    tela: telaProdutora,    sempre: true },
+// Menu lateral, agrupado: Contratos · Cadastro · Financeiro · Documentos · Painel
+const MENU = [
+  { s: { id: 'eventos', rotulo: 'Contratos', tela: telaEventos, sempre: true } },
+  { grupo: 'Cadastro', itens: [
+    { id: 'fornecedores', rotulo: 'Fornecedores', tela: telaFornecedores, perm: 'gerir_fornecedores' },
+    { id: 'usuarios',     rotulo: 'Usuários',     tela: telaUsuarios,     perm: 'gerir_usuarios' },
+    { id: 'produtora',    rotulo: 'Organização',  tela: telaProdutora,    sempre: true },
+  ] },
+  { s: { id: 'pagamentos', rotulo: 'Financeiro', tela: telaPagamentos,    pagador: true } },
+  { s: { id: 'documentos', rotulo: 'Documentos', tela: telaDocumentos,    sempre: true } },
+  { s: { id: 'painel',     rotulo: 'Painel',      tela: telaPainelEmpresa, perm: 'ver_painel' } },
 ];
+const SECOES = MENU.flatMap(b => b.grupo ? b.itens : [b.s]);
 
 function secoesVisiveis() {
   const m = sessao.membros[0];
@@ -84,44 +88,62 @@ function secoesVisiveis() {
 
 async function montarEstrutura() {
   const app = document.getElementById('app');
-  const secoes = secoesVisiveis();
   const empresa = empresaAtual();
+  const m = sessao.membros[0];
+  const admin = m && (m.papel === 'mestre' || m.papel === 'administrador');
+  const pagador = admin || sessao.permissoesPagamento === true;
+  const visivel = s => s.sempre || admin || (s.pagador && pagador) || (s.perm && m && m[s.perm]);
+
+  const navHTML = MENU.map(b => {
+    if (b.grupo) {
+      const itens = b.itens.filter(visivel);
+      if (!itens.length) return '';
+      return `<div class="nav-grupo">${esc(b.grupo)}</div>` +
+        itens.map(s => `<button class="nav-item nav-sub" data-secao="${s.id}">${esc(s.rotulo)}</button>`).join('');
+    }
+    return visivel(b.s) ? `<button class="nav-item" data-secao="${b.s.id}">${esc(b.s.rotulo)}</button>` : '';
+  }).join('');
 
   app.innerHTML = `
-    <header class="topo">
-      <span class="marca">${esc(APP.nome)}</span>
-      ${empresa ? `
-        <span class="topo-empresa" title="Organização em que você está operando">
-          ${empresa.logo_url
-            ? `<img src="${esc(empresa.logo_url)}" alt="">`
-            : `<span class="sigla">${esc(iniciais(empresa.nome))}</span>`}
-          <span class="nome">${esc(empresa.nome)}</span>
-        </span>` : ''}
-      ${secoes.length > 1 ? `
-        <nav class="navegacao">
-          ${secoes.map((s, i) => `
-            <button class="nav-item ${i === 0 ? 'ativo' : ''}" data-secao="${s.id}">${esc(s.rotulo)}</button>
-          `).join('')}
-        </nav>` : ''}
-      <div class="espaco"></div>
-      <button id="btn-olho" aria-label="Mostrar ou ocultar valores" style="background:none;border:none;cursor:pointer;color:var(--texto-2);display:flex;align-items:center;padding:6px;margin-right:2px"></button> 
-      <button class="avatar" id="btn-conta" aria-label="Sua conta">${esc(iniciais(sessao.usuario.nome))}</button>
-    </header>
+    <button class="btn-menu" id="btn-menu" aria-label="Abrir menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg></button>
+    <div class="nav-backdrop" id="nav-backdrop" hidden></div>
+    <aside class="lateral" id="lateral">
+      <div class="lateral-topo">
+        <span class="marca">${esc(APP.nome)}</span>
+        ${empresa ? `
+          <span class="topo-empresa" title="Organização em que você está operando">
+            ${empresa.logo_url
+              ? `<img src="${esc(empresa.logo_url)}" alt="">`
+              : `<span class="sigla">${esc(iniciais(empresa.nome))}</span>`}
+            <span class="nome">${esc(empresa.nome)}</span>
+          </span>` : ''}
+      </div>
+      <nav class="lateral-nav">${navHTML}</nav>
+      <div class="lateral-rodape">
+        <button id="btn-olho" class="rodape-btn" aria-label="Mostrar ou ocultar valores"></button>
+        <button class="avatar" id="btn-conta" aria-label="Sua conta">${esc(iniciais(sessao.usuario.nome))}</button>
+      </div>
+    </aside>
     <main class="conteudo" id="conteudo"></main>
   `;
   app.hidden = false;
   document.getElementById('carregando').hidden = true;
 
+  const fecharDrawer = () => document.body.classList.remove('menu-aberto');
+  document.getElementById('btn-menu').addEventListener('click', () => document.body.classList.toggle('menu-aberto'));
+  document.getElementById('nav-backdrop').addEventListener('click', fecharDrawer);
+
   document.getElementById('btn-conta').addEventListener('click', e => {
     e.stopPropagation();
     alternarMenuConta();
   });
-const olho = document.getElementById('btn-olho');
+  const olho = document.getElementById('btn-olho');
   const pintarOlho = () => { olho.innerHTML = iconeOlho(privadoAtivo()); };
   pintarOlho();
   olho.addEventListener('click', () => { alternarPrivado(); pintarOlho(); });
+
   app.querySelectorAll('[data-secao]').forEach(b => {
-    b.addEventListener('click', () => irPara(b.dataset.secao));
+    b.addEventListener('click', () => { irPara(b.dataset.secao); fecharDrawer(); });
   });
 
   document.addEventListener('voltar-eventos', () => irPara('eventos'));
@@ -132,6 +154,7 @@ const olho = document.getElementById('btn-olho');
     if (alvo && e) alvo.textContent = e.nome;
   });
 
+  const secoes = secoesVisiveis();
   await irPara(secoes[0].id);
 }
 
