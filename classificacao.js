@@ -11,11 +11,13 @@ import {
   listarClassificacao, importarClassificacao,
   salvarNoClassificacao, apagarNoClassificacao,
   listarLancamentos, salvarLancamento, apagarLancamento,
+  listarCotacoesLanc, salvarCotacoesLanc,
+  documentosDoLancamento, anexarDocumento, apagarDocumento, linkDocumento,
   listarFornecedores, empresaAtual,
 } from './nucleo.js';
 import {
   esc, aviso, abrirModal, fecharModal, comBotao,
-  moeda, numero, dataBR, aplicarMascaraMoeda, lerMoeda,
+  moeda, numero, dataBR, aplicarMascaraMoeda, lerMoeda, montarAnexos,
 } from './ui.js';
 
 let _alvo = null;
@@ -314,6 +316,12 @@ async function modalLancamento(no, lanc) {
   const ed = !!lanc;
   const l = lanc || {};
   if (!_forns) { try { _forns = await listarFornecedores(empresaAtual()?.id); } catch (_) { _forns = []; } }
+  let cotExist = [];
+  if (ed) { try { cotExist = await listarCotacoesLanc(l.id); } catch (_) { cotExist = []; } }
+  const cotLin = [0, 1, 2].map(n => cotExist[n] || {});
+  let cotEscolhida = cotExist.findIndex(c => c.escolhida);
+  if (cotEscolhida < 0) cotEscolhida = null;
+  const temCot = cotExist.length > 0;
   const FORMAS = ['Boleto', 'Pix', 'Transferência', 'Dinheiro', 'Cartão', 'Outro'];
 
   abrirModal(ed ? 'Editar lançamento' : 'Novo lançamento', `
@@ -351,10 +359,29 @@ async function modalLancamento(no, lanc) {
         <label for="l-doc">Nº do documento / nota</label>
         <input class="controle" id="l-doc" value="${esc(l.documento_numero || '')}">
       </div>
+
+      <details class="calculadora" ${temCot ? 'open' : ''}>
+        <summary>Cotações (3 orçamentos)</summary>
+        <datalist id="lc-forns">${_forns.map(f => `<option value="${esc(f.nome)}"></option>`).join('')}</datalist>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+          ${cotLin.map((c, n) => `
+            <div class="lc-cot" data-linha="${n}" style="display:grid;grid-template-columns:minmax(0,1.2fr) 100px minmax(0,1fr) auto;gap:8px;align-items:center">
+              <input class="controle lc-forn" list="lc-forns" placeholder="Fornecedor ${n + 1}" value="${esc(c.fornecedor_nome || '')}">
+              <input class="controle lc-valor" data-moeda placeholder="0,00" value="${c.valor ?? ''}">
+              <input class="controle lc-obs" placeholder="Obs" value="${esc(c.observacao || '')}">
+              <button type="button" class="botao lc-sel ${cotEscolhida === n ? 'botao-primario' : ''}" data-sel="${n}">${cotEscolhida === n ? '✓ Vencedora' : 'Escolher'}</button>
+            </div>`).join('')}
+        </div>
+        <div class="dica">A cotação escolhida preenche o fornecedor e o valor acima.</div>
+      </details>
+
       <div class="campo">
         <label for="l-obs">Observações</label>
         <textarea class="controle" id="l-obs">${esc(l.observacoes || '')}</textarea>
       </div>
+      ${ed
+        ? `<div id="lan-docs" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--borda)"></div>`
+        : `<div class="dica" style="margin-top:10px">Salve para anexar os documentos (nota, CNDs, comprovante, capa…).</div>`}
       <div class="modal-acoes">
         ${ed ? `<button type="button" class="botao botao-perigo" id="l-apagar" style="margin-right:auto">Apagar</button>` : ''}
         <button type="button" class="botao" id="l-cancelar">Cancelar</button>
@@ -364,6 +391,38 @@ async function modalLancamento(no, lanc) {
 
   aplicarMascaraMoeda();
   const q = s => document.querySelector(s);
+
+  if (ed && q('#lan-docs')) {
+    montarAnexos('#lan-docs', {
+      podeGerir: true,
+      carregar: () => documentosDoLancamento(l.id),
+      anexar: ({ arquivo, categoria }) => anexarDocumento({ evento_id: contexto.evento.id, lancamento_id: l.id, categoria, arquivo }),
+      apagar: (id, caminho) => apagarDocumento(id, caminho),
+      abrir: (caminho) => linkDocumento(caminho),
+    });
+  }
+
+  // cotações: escolher vencedora preenche fornecedor + valor
+  let escolhida = cotEscolhida;
+  document.querySelectorAll('.lc-sel').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const n = Number(btn.dataset.sel);
+      escolhida = (escolhida === n) ? null : n;
+      document.querySelectorAll('.lc-sel').forEach(b => {
+        const sel = Number(b.dataset.sel) === escolhida;
+        b.classList.toggle('botao-primario', sel);
+        b.textContent = sel ? '✓ Vencedora' : 'Escolher';
+      });
+      if (escolhida != null) {
+        const linha = document.querySelector(`.lc-cot[data-linha="${escolhida}"]`);
+        const nome = linha.querySelector('.lc-forn').value.trim();
+        const v = lerMoeda(linha.querySelector('.lc-valor'));
+        if (nome) q('#l-forn').value = nome;
+        if (v) { q('#l-valor').value = v.toFixed(2); q('#l-valor').dispatchEvent(new Event('input')); }
+      }
+    });
+  });
+
   q('#l-cancelar').addEventListener('click', () => detalheRubrica(no));
   q('#l-apagar')?.addEventListener('click', async () => {
     if (!confirm('Apagar este lançamento?')) return;
@@ -376,13 +435,19 @@ async function modalLancamento(no, lanc) {
     if (!valor) return aviso('Informe o valor.', 'aviso');
     await comBotao(q('#l-salvar'), async () => {
       try {
-        await salvarLancamento(contexto.evento.id, l.id || null, {
+        const salvo = await salvarLancamento(contexto.evento.id, l.id || null, {
           classificacao_id: no.id, tipo: 'despesa',
           fornecedor_nome: q('#l-forn').value, descricao: q('#l-desc').value,
           valor, data_competencia: q('#l-emis').value || null, data_pagamento: q('#l-pgto').value || null,
           forma_pagamento: q('#l-forma').value || null, documento_numero: q('#l-doc').value,
           observacoes: q('#l-obs').value,
         });
+        const cot = [...document.querySelectorAll('.lc-cot')].map(li => {
+          const v = lerMoeda(li.querySelector('.lc-valor'));
+          return { fornecedor_nome: li.querySelector('.lc-forn').value, valor: v ? v : '', observacao: li.querySelector('.lc-obs').value };
+        });
+        try { await salvarCotacoesLanc(empresaAtual().id, salvo.id, cot, escolhida); }
+        catch (err) { aviso('Lançamento salvo, mas as cotações falharam: ' + err.message, 'aviso', 8000); }
         aviso(ed ? 'Salvo.' : 'Lançamento adicionado.');
         detalheRubrica(no);
       } catch (err) { aviso(err.message, 'erro'); }

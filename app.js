@@ -14,6 +14,7 @@ import { telaEventos } from './eventos.js';
 import { telaPainelEmpresa } from './painel_empresa.js';
 import { telaUsuarios } from './usuarios.js';
 import { telaFornecedores } from './fornecedores.js';
+import { telaFuncionarios } from './funcionarios.js';
 import { telaProdutora } from './produtora.js';
 import { telaPagamentos } from './pagamentos.js';
 import { telaDocumentos } from './documentos.js';
@@ -67,6 +68,7 @@ const MENU = [
   { s: { id: 'eventos', rotulo: 'Contratos', tela: telaEventos, sempre: true } },
   { grupo: 'Cadastro', itens: [
     { id: 'fornecedores', rotulo: 'Fornecedores', tela: telaFornecedores, perm: 'gerir_fornecedores' },
+    { id: 'funcionarios', rotulo: 'Funcionários', tela: telaFuncionarios, perm: 'gerir_fornecedores' },
     { id: 'usuarios',     rotulo: 'Usuários',     tela: telaUsuarios,     perm: 'gerir_usuarios' },
     { id: 'produtora',    rotulo: 'Organização',  tela: telaProdutora,    sempre: true },
   ] },

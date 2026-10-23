@@ -2,11 +2,9 @@
 // Dentro de um contrato — cabeçalho, abas e painel
 // ═══════════════════════════════════════════════════════
 
-import { buscarEvento, listarItens, minhaPermissao, andamentoItens, listarReceitas, encerrarEvento, apagarEvento } from './nucleo.js';
+import { buscarEvento, listarItens, minhaPermissao, listarReceitas, listarClassificacao, listarLancamentos, encerrarEvento, apagarEvento } from './nucleo.js';
 import { esc, aviso, moeda, numero, periodo, dataBR, iniciais, SITUACAO_EVENTO, registrarView } from './ui.js';
-import { abaProducao } from './producao.js';
 import { abaClassificacao } from './classificacao.js';
-import { abaSolicitacoes, abaAprovacoes } from './solicitacoes.js';
 import { abaReceitas } from './receitas.js';
 
 export const contexto = { evento: null, permissao: null, itens: [], aba: 'painel' };
@@ -14,9 +12,6 @@ export const contexto = { evento: null, permissao: null, itens: [], aba: 'painel
 const ABAS = [
   { id: 'painel',       rotulo: 'Painel' },
   { id: 'classificacao', rotulo: 'Classificação' },
-  { id: 'producao',     rotulo: 'Descritivo' },
-  { id: 'solicitacoes', rotulo: 'Solicitações' },
-  { id: 'aprovacoes',   rotulo: 'Aprovações', perm: 'aprovar_pagamento' },
   { id: 'receitas',     rotulo: 'Repasses',   perm: 'ver_receitas' },
   { id: 'prestacao',    rotulo: 'Prestação de contas' },
 ];
@@ -113,12 +108,9 @@ function desenhar() {
   });
 
   const corpo = alvo.querySelector('#aba-conteudo');
-  if (contexto.aba === 'producao')          abaProducao(corpo);
-  else if (contexto.aba === 'classificacao') abaClassificacao(corpo);
-  else if (contexto.aba === 'solicitacoes') abaSolicitacoes(corpo);
-  else if (contexto.aba === 'aprovacoes')   abaAprovacoes(corpo);
-  else if (contexto.aba === 'receitas')     abaReceitas(corpo);
-  else if (contexto.aba === 'prestacao')    abaPrestacaoPreview(corpo);
+  if (contexto.aba === 'classificacao')      abaClassificacao(corpo);
+  else if (contexto.aba === 'receitas')      abaReceitas(corpo);
+  else if (contexto.aba === 'prestacao')     abaPrestacaoPreview(corpo);
   else                                       abaPainel(corpo);
 }
 
@@ -171,29 +163,28 @@ function abaPrestacaoPreview(alvo) {
 
 async function abaPainel(alvo) {
   const ev = contexto.evento;
-  const itens = contexto.itens.filter(i => i.situacao !== 'cancelado');
+  alvo.innerHTML = `<div style="padding:30px;text-align:center;color:var(--texto-2)">Carregando painel...</div>`;
 
-  // sem itens: convida a começar, sem painel
-  if (!itens.length) {
+  // Modelo novo: orçamento vem da Classificação (folhas) e o realizado
+  // vem dos Lançamentos. Nada de item_producao/solicitações aqui.
+  let nos = [], lancs = [];
+  try {
+    [nos, lancs] = await Promise.all([listarClassificacao(ev.id), listarLancamentos(ev.id)]);
+  } catch (e) { /* segue com o que tiver */ }
+
+  // sem classificação: convida a montar o plano de contas
+  if (!nos.length) {
     alvo.innerHTML = `
       <div class="vazio">
-        <h3>Orçamento vazio</h3>
-        <p>Comece cadastrando os itens na aba Descritivo, ou importe a planilha do contrato anterior.</p>
-        <button class="botao botao-primario" id="ir-producao">Ir para Descritivo</button>
+        <h3>Sem plano de contas</h3>
+        <p>Comece pela aba <b>Classificação</b>: importe a planilha do contrato ou monte as rubricas. É nela que entra o orçado e, depois, os lançamentos.</p>
+        <button class="botao botao-primario" id="ir-classificacao">Ir para Classificação</button>
       </div>`;
-    alvo.querySelector('#ir-producao')?.addEventListener('click', () => {
-      contexto.aba = 'producao'; desenhar();
+    alvo.querySelector('#ir-classificacao')?.addEventListener('click', () => {
+      contexto.aba = 'classificacao'; desenhar();
     });
     return;
   }
-
-  alvo.innerHTML = `<div style="padding:30px;text-align:center;color:var(--texto-2)">Carregando painel...</div>`;
-
-  // andamento financeiro por item (solicitado, pago, em fluxo)
-  const andamento = {};
-  try {
-    (await andamentoItens(ev.id)).forEach(a => { andamento[a.item_id] = a; });
-  } catch (e) { /* segue sem o financeiro; o orçamento ainda aparece */ }
 
   // receitas — só para quem pode ver (dado sensível)
   const podeVerReceitas = contexto.permissao?.admin || contexto.permissao?.ver_receitas;
@@ -202,40 +193,44 @@ async function abaPainel(alvo) {
     try { receitas = await listarReceitas(ev.id); } catch (e) { receitas = []; }
   }
 
-  // ── números ──
-  const orcado = itens.reduce((a, i) => a + Number(i.valor_orcado || 0), 0);
-  const referencia = itens.reduce((a, i) => a + Number(i.custo_referencia || 0), 0);
-  const diferenca = orcado - referencia;
+  // ── orçado (soma das folhas) e realizado (soma dos lançamentos) ──
+  const folhas = nos.filter(n => !n.eh_grupo);
+  const orcado = folhas.reduce((a, n) => a + Number(n.valor_orcado || 0), 0);
+  const realizado = lancs.reduce((a, l) => a + Number(l.valor || 0), 0);
+  const saldo = orcado - realizado;
+  const pctExec = orcado > 0 ? Math.round(realizado / orcado * 100) : 0;
 
-  let solicitado = 0, pago = 0;
-  itens.forEach(i => {
-    const a = andamento[i.id];
-    solicitado += Number(a?.solicitado || 0);
-    pago += Number(a?.pago || 0);
+  // ── por rubrica de topo (código sem ponto: A, B, C…) ──
+  const topo = {};   // codigoTopo -> { nome, orcado, realizado }
+  const nomeTopo = {};
+  nos.forEach(n => {
+    const t = (n.codigo || '').split('.')[0] || '—';
+    if ((n.nivel || 0) === 0) nomeTopo[t] = n.nome;
   });
-  const emAberto = Math.max(solicitado - pago, 0);
-  const aSolicitar = Math.max(orcado - solicitado, 0);
-  const pct = v => orcado > 0 ? Math.max(0, Math.min(100, v / orcado * 100)) : 0;
-
-  // por categoria: orçado (trilha) e pago (preenchimento)
-  const porCategoria = {};
-  itens.forEach(i => {
-    const k = i.categoria_nome || 'Sem categoria';
-    if (!porCategoria[k]) porCategoria[k] = { orcado: 0, pago: 0 };
-    porCategoria[k].orcado += Number(i.valor_orcado || 0);
-    porCategoria[k].pago += Number(andamento[i.id]?.pago || 0);
+  folhas.forEach(n => {
+    const t = (n.codigo || '').split('.')[0] || '—';
+    if (!topo[t]) topo[t] = { nome: nomeTopo[t] || t, orcado: 0, realizado: 0 };
+    topo[t].orcado += Number(n.valor_orcado || 0);
   });
-  const cats = Object.entries(porCategoria).sort((a, b) => b[1].orcado - a[1].orcado);
+  const folhaPorId = {};
+  folhas.forEach(n => { folhaPorId[n.id] = n; });
+  lancs.forEach(l => {
+    const f = folhaPorId[l.classificacao_id];
+    const t = f ? ((f.codigo || '').split('.')[0] || '—') : '—';
+    if (!topo[t]) topo[t] = { nome: nomeTopo[t] || 'Sem rubrica', orcado: 0, realizado: 0 };
+    topo[t].realizado += Number(l.valor || 0);
+  });
+  const rubricas = Object.entries(topo).sort((a, b) => b[1].orcado - a[1].orcado);
 
   // receitas: totais, resultado e por fonte
   const receitaPrevista = receitas.reduce((a, r) => a + Number(r.valor_previsto || 0), 0);
   const recebido = receitas.reduce((a, r) => a + Number(r.recebido || 0), 0);
   const resultadoPrevisto = receitaPrevista - orcado;
-  const resultadoReal = recebido - pago;
+  const resultadoReal = recebido - realizado;
   const aReceberEv = Math.max(receitaPrevista - recebido, 0);
   const podeEncerrar = contexto.permissao?.admin
     && ev.situacao !== 'encerrado'
-    && solicitado > 0.005 && emAberto <= 0.005 && aReceberEv <= 0.005;
+    && realizado > 0.005 && saldo >= -0.005 && aReceberEv <= 0.005;
   const porFonte = {};
   receitas.forEach(r => {
     const k = r.fonte_nome || 'Sem fonte';
@@ -250,26 +245,9 @@ async function abaPainel(alvo) {
   const ini = ev.data_inicio ? new Date(ev.data_inicio + 'T00:00:00') : null;
   const dias = ini ? Math.round((ini - hoje) / 86400000) : null;
 
-  // contagem de itens por situação (inclui cancelados) e por andamento
-  const SITU = { previsto:['Previsto',''], orcado:['Orçado','acento'], contratado:['Contratado','verde'], cancelado:['Cancelado','vermelho'] };
-  const cSit = { previsto:0, orcado:0, contratado:0, cancelado:0 };
-  contexto.itens.forEach(i => { const s = i.situacao || 'orcado'; if (cSit[s] != null) cSit[s]++; });
-  const cAnd = { a_solicitar:0, solicitado:0, pago_parcial:0, pago:0 };
-  itens.forEach(i => {
-    const orc = Number(i.valor_orcado||0), a = andamento[i.id]||{}, sol = Number(a.solicitado||0), pg = Number(a.pago||0);
-    if (orc>0 && pg >= orc-0.005) cAnd.pago++;
-    else if (pg>0) cAnd.pago_parcial++;
-    else if (sol>0) cAnd.solicitado++;
-    else cAnd.a_solicitar++;
-  });
-  const chipCnt = (rot, n, cls) => `<span class="chip-cnt ${cls}" data-ir-producao="1"><span>${esc(rot)}</span><span class="c">${numero(n)}</span></span>`;
-  const chipsSituacao  = Object.entries(SITU).map(([k,[rot,cls]]) => chipCnt(rot, cSit[k], cls)).join('');
-  const AND = { a_solicitar:['A solicitar',''], solicitado:['Solicitado','acento'], pago_parcial:['Pago parcial','ambar'], pago:['Pago','verde'] };
-  const chipsAndamento = Object.entries(AND).map(([k,[rot,cls]]) => chipCnt(rot, cAnd[k], cls)).join('');
-
   alvo.innerHTML = `
     <div style="display:flex;justify-content:${podeEncerrar ? 'space-between' : 'flex-end'};align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
-      ${podeEncerrar ? `<span class="etiqueta etiqueta-verde">Contrato quitado — pronto para encerrar</span>` : ''}
+      ${podeEncerrar ? `<span class="etiqueta etiqueta-verde">Dentro do orçado — pronto para encerrar</span>` : ''}
       <div style="display:flex;gap:8px">
         ${podeEncerrar ? `<button class="botao botao-primario" id="ev-encerrar" style="height:32px;font-size:13px">Encerrar contrato</button>` : ''}
         <button class="botao" id="ev-pdf" style="height:32px;font-size:13px">Exportar PDF</button>
@@ -277,13 +255,13 @@ async function abaPainel(alvo) {
     </div>
     <div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-bottom:20px">
       <div class="cartao">
-        <div style="font-weight:600;font-size:12px;color:var(--texto-2);margin-bottom:10px;text-transform:uppercase;letter-spacing:.03em">Orçado × Executado</div>
+        <div style="font-weight:600;font-size:12px;color:var(--texto-2);margin-bottom:10px;text-transform:uppercase;letter-spacing:.03em">Orçado × Realizado</div>
         <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
           <span>Orçado <b class="num">${moeda(orcado)}</b></span>
-          <span>Pago <b class="num" style="color:var(--verde)">${moeda(pago)}</b></span>
+          <span>Realizado <b class="num" style="color:var(--verde)">${moeda(realizado)}</b></span>
         </div>
-        <div style="height:10px;border-radius:20px;background:var(--superficie-2);overflow:hidden"><div style="height:100%;width:${orcado > 0 ? Math.min(100, Math.round(pago / orcado * 100)) : 0}%;background:var(--verde)"></div></div>
-        <div class="rotulo" style="margin-top:5px">${orcado > 0 ? Math.round(pago / orcado * 100) : 0}% executado</div>
+        <div style="height:10px;border-radius:20px;background:var(--superficie-2);overflow:hidden"><div style="height:100%;width:${Math.min(100, pctExec)}%;background:${realizado > orcado ? 'var(--vermelho)' : 'var(--verde)'}"></div></div>
+        <div class="rotulo" style="margin-top:5px">${pctExec}% executado · saldo <b class="num" style="color:${saldo < 0 ? 'var(--vermelho)' : 'var(--texto)'}">${moeda(saldo)}</b></div>
       </div>
       ${podeVerReceitas ? `
       <div class="cartao">
@@ -301,7 +279,7 @@ async function abaPainel(alvo) {
           <div><div class="rotulo">Previsto</div><div style="font-weight:700;font-size:18px;color:${resultadoPrevisto >= 0 ? 'var(--verde)' : 'var(--vermelho)'}">${resultadoPrevisto >= 0 ? '+' : ''}${moeda(resultadoPrevisto)}</div></div>
           <div style="text-align:right"><div class="rotulo">Fluxo real</div><div style="font-weight:700;font-size:18px;color:${resultadoReal >= 0 ? 'var(--verde)' : 'var(--vermelho)'}">${resultadoReal >= 0 ? '+' : ''}${moeda(resultadoReal)}</div></div>
         </div>
-        <div class="rotulo" style="margin-top:6px">previsto = repasse − orçado · real = recebido − pago</div>
+        <div class="rotulo" style="margin-top:6px">previsto = repasse − orçado · real = recebido − realizado</div>
       </div>` : ''}
     </div>
 
@@ -314,92 +292,43 @@ async function abaPainel(alvo) {
         </div>
       </div>` : ''}
 
-
-    <h2 style="font-size:15px;margin:24px 0 10px">Orçamento</h2>
+    <h2 style="font-size:15px;margin:24px 0 10px">Resumo</h2>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">
       <div class="metrica">
         <div class="rotulo">Orçado</div>
         <div class="valor">${moeda(orcado)}</div>
-        <div class="rotulo" style="margin-top:2px">${numero(itens.length)} ${itens.length === 1 ? 'item' : 'itens'}</div>
+        <div class="rotulo" style="margin-top:2px">${numero(folhas.length)} ${folhas.length === 1 ? 'rubrica' : 'rubricas'}</div>
       </div>
       <div class="metrica">
-        <div class="rotulo">Contrato anterior</div>
-        <div class="valor" style="color:var(--texto-2)">${moeda(referencia)}</div>
-        <div class="rotulo" style="margin-top:2px">referência de custo</div>
+        <div class="rotulo">Realizado</div>
+        <div class="valor" style="color:var(--verde)">${moeda(realizado)}</div>
+        <div class="rotulo" style="margin-top:2px">${numero(lancs.length)} ${lancs.length === 1 ? 'lançamento' : 'lançamentos'}</div>
       </div>
       <div class="metrica">
-        <div class="rotulo">Diferença</div>
-        <div class="valor" style="color:${diferenca > 0 ? 'var(--vermelho)' : 'var(--verde)'}">
-          ${diferenca > 0 ? '+' : ''}${moeda(diferenca)}
-        </div>
-        <div class="rotulo" style="margin-top:2px">${referencia ? (diferenca >= 0 ? 'acima' : 'abaixo') + ' do ano anterior' : 'sem referência'}</div>
+        <div class="rotulo">Saldo</div>
+        <div class="valor" style="color:${saldo < 0 ? 'var(--vermelho)' : 'var(--verde)'}">${moeda(saldo)}</div>
+        <div class="rotulo" style="margin-top:2px">${saldo < 0 ? 'acima do orçado' : 'disponível'}</div>
       </div>
     </div>
 
-    <h2 style="font-size:15px;margin:24px 0 10px">Fluxo de pagamento</h2>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">
-      <div class="metrica">
-        <div class="rotulo">Solicitado</div>
-        <div class="valor">${moeda(solicitado)}</div>
-        <div class="rotulo" style="margin-top:2px">comprometido</div>
-      </div>
-      <div class="metrica">
-        <div class="rotulo">Pago</div>
-        <div class="valor" style="color:var(--verde)">${moeda(pago)}</div>
-        <div class="rotulo" style="margin-top:2px">já saiu do caixa</div>
-      </div>
-      <div class="metrica">
-        <div class="rotulo">Em aberto</div>
-        <div class="valor" style="color:var(--ambar)">${moeda(emAberto)}</div>
-        <div class="rotulo" style="margin-top:2px">solicitado e não pago</div>
-      </div>
-    </div>
-    <div class="cartao" style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;margin-top:12px">
-      <div style="position:relative;width:150px;height:150px;flex-shrink:0">
-        <svg width="150" height="150" viewBox="0 0 150 150" style="transform:rotate(-90deg)">
-          <circle cx="75" cy="75" r="52" fill="none" stroke="var(--superficie-2)" stroke-width="16"/>
-          ${pago > 0 ? `<circle cx="75" cy="75" r="52" fill="none" stroke="var(--verde)" stroke-width="16" stroke-dasharray="${(326.726*pago/(orcado||1)).toFixed(1)} 326.726" stroke-dashoffset="0"/>` : ''}
-          ${emAberto > 0 ? `<circle cx="75" cy="75" r="52" fill="none" stroke="var(--ambar)" stroke-width="16" stroke-dasharray="${(326.726*emAberto/(orcado||1)).toFixed(1)} 326.726" stroke-dashoffset="${(-326.726*pago/(orcado||1)).toFixed(1)}"/>` : ''}
-          ${aSolicitar > 0 ? `<circle cx="75" cy="75" r="52" fill="none" stroke="var(--borda-forte)" stroke-width="16" stroke-dasharray="${(326.726*aSolicitar/(orcado||1)).toFixed(1)} 326.726" stroke-dashoffset="${(-326.726*(pago+emAberto)/(orcado||1)).toFixed(1)}"/>` : ''}
-        </svg>
-        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
-          <div style="font-family:inherit;font-size:27px;font-weight:700;color:var(--verde);line-height:1">${orcado>0?Math.round(pago/orcado*100):0}%</div>
-          <div style="font-size:11px;color:var(--texto-2)">pago</div>
-        </div>
-      </div>
-      <div style="flex:1;min-width:160px;display:flex;flex-direction:column;gap:10px">
-        <div style="display:flex;align-items:center;gap:8px;font-size:13px">${pontinho('var(--verde)')}Pago<span class="num" style="margin-left:auto;font-weight:600">${moeda(pago)}</span></div>
-        <div style="display:flex;align-items:center;gap:8px;font-size:13px">${pontinho('var(--ambar)')}Em aberto<span class="num" style="margin-left:auto;font-weight:600">${moeda(emAberto)}</span></div>
-        <div style="display:flex;align-items:center;gap:8px;font-size:13px">${pontinho('var(--borda-forte)')}A solicitar<span class="num" style="margin-left:auto;font-weight:600">${moeda(aSolicitar)}</span></div>
-        <div class="rotulo" style="margin-top:2px">${pago>=orcado&&orcado>0 ? '<span style="color:var(--verde);font-weight:600">100% pago — tudo quitado 🎉</span>' : 'sobre o orçado de '+moeda(orcado)}</div>
-      </div>
-    </div>
-
-    <h2 style="font-size:15px;margin:24px 0 10px">Itens <span class="rotulo" style="font-weight:400">· toque para ver na Produção</span></h2>
+    <h2 style="font-size:15px;margin:24px 0 10px">Execução por rubrica <span class="rotulo" style="font-weight:400">· toque para abrir na Classificação</span></h2>
     <div class="cartao">
-      <div class="rotulo" style="margin-bottom:8px">Por situação</div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">${chipsSituacao}</div>
-      <div class="rotulo" style="margin-bottom:8px">Por andamento</div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px">${chipsAndamento}</div>
-    </div>
-
-    <h2 style="font-size:15px;margin:24px 0 10px">Gastos por categoria</h2>
-    <div class="cartao">
-      ${cats.map(([nome, v]) => {
-        const p = v.orcado > 0 ? Math.round(v.pago / v.orcado * 100) : 0;
+      ${rubricas.map(([cod, v]) => {
+        const p = v.orcado > 0 ? Math.round(v.realizado / v.orcado * 100) : (v.realizado > 0 ? 100 : 0);
+        const estouro = v.realizado > v.orcado + 0.005;
         return `
-        <div style="margin-bottom:12px">
+        <div style="margin-bottom:14px;cursor:pointer" data-ir-classificacao="1">
           <div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;margin-bottom:4px">
-            <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(nome)}</span>
-            <span style="white-space:nowrap"><span class="num" style="color:var(--verde);font-weight:500">${moeda(v.pago)}</span> <span style="color:var(--texto-3)">/ ${moeda(v.orcado)}</span></span>
+            <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b style="color:var(--texto-3);font-weight:600;margin-right:4px">${esc(cod)}</b>${esc(v.nome)}</span>
+            <span style="white-space:nowrap"><span class="num" style="color:${estouro ? 'var(--vermelho)' : 'var(--verde)'};font-weight:500">${moeda(v.realizado)}</span> <span style="color:var(--texto-3)">/ ${moeda(v.orcado)}</span></span>
           </div>
           <div style="height:8px;background:var(--superficie-2);border-radius:4px;overflow:hidden">
-            <div style="height:100%;width:${p}%;background:var(--verde)"></div>
+            <div style="height:100%;width:${Math.min(100, p)}%;background:${estouro ? 'var(--vermelho)' : 'var(--verde)'}"></div>
           </div>
         </div>`;
       }).join('')}
       <div class="rotulo" style="margin-top:6px;display:flex;gap:16px;align-items:center">
-        <span>${pontinho('var(--verde)')}pago</span>
+        <span>${pontinho('var(--verde)')}realizado</span>
         <span>${pontinho('var(--borda-forte)')}orçado</span>
       </div>
     </div>
@@ -429,11 +358,11 @@ async function abaPainel(alvo) {
       <div class="cartao" style="color:var(--texto-2);font-size:14px">Nenhum repasse cadastrado ainda.</div>`) : ''}
   `;
 
-  alvo.querySelectorAll('[data-ir-producao]').forEach(el =>
-    el.addEventListener('click', () => { contexto.aba = 'producao'; desenhar(); }));
+  alvo.querySelectorAll('[data-ir-classificacao]').forEach(el =>
+    el.addEventListener('click', () => { contexto.aba = 'classificacao'; desenhar(); }));
   alvo.querySelector('#ev-pdf')?.addEventListener('click', () => window.print());
   alvo.querySelector('#ev-encerrar')?.addEventListener('click', async () => {
-    if (!confirm('Encerrar este contrato? Isso trava novos lançamentos (itens, solicitações, receitas). Dá pra reabrir depois mudando a situação no cadastro do contrato.')) return;
+    if (!confirm('Encerrar este contrato? Isso trava novos lançamentos. Dá pra reabrir depois mudando a situação no cadastro do contrato.')) return;
     try {
       await encerrarEvento(ev.id);
       contexto.evento.situacao = 'encerrado';

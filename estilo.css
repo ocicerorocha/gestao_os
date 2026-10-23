@@ -758,3 +758,16 @@ body.menu-aberto .topo { z-index: 60; }
   .btn-menu{ display:none !important; }
   .nav-backdrop{ display:none !important; }
 }
+
+/* ═══ Controle segmentado (ex.: CLT / PJ) ══════════════ */
+.segmentos{
+  display:inline-flex; gap:4px; padding:3px;
+  background:var(--superficie-2); border:1px solid var(--borda); border-radius:12px;
+}
+.segmentos .seg{
+  border:none; background:none; cursor:pointer; font-family:inherit;
+  font-size:14px; font-weight:500; color:var(--texto-2);
+  padding:7px 20px; border-radius:9px; transition:background var(--transicao), color var(--transicao);
+}
+.segmentos .seg:hover{ color:var(--texto); }
+.segmentos .seg.ativo{ background:var(--superficie); color:var(--texto); box-shadow:0 1px 3px rgba(0,0,0,.08); }

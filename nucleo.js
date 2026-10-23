@@ -743,6 +743,104 @@ export async function apagarLancamento(id) {
   if (error) throw new Error(traduzErro(error.message));
 }
 
+/* ── cotações do lançamento ───────────────────────────── */
+export async function listarCotacoesLanc(lancamentoId) {
+  if (!lancamentoId) return [];
+  const { data, error } = await bd.from('cotacao')
+    .select('id, fornecedor_nome, valor, observacao, escolhida, ordem')
+    .eq('lancamento_id', lancamentoId).order('ordem', { ascending: true });
+  if (error) throw new Error(traduzErro(error.message));
+  return data || [];
+}
+export async function salvarCotacoesLanc(empresaId, lancamentoId, linhas, escolhida) {
+  const validas = (linhas || []).map((l, i) => ({ ...l, _i: i }))
+    .filter(l => (l.fornecedor_nome || '').trim() || (l.valor !== '' && l.valor != null));
+  await bd.from('cotacao').delete().eq('lancamento_id', lancamentoId);
+  if (validas.length) {
+    const rows = validas.map((l, idx) => ({
+      lancamento_id: lancamentoId,
+      fornecedor_nome: (l.fornecedor_nome || '').trim() || '(sem nome)',
+      valor: (l.valor === '' || l.valor == null) ? null : Number(l.valor),
+      observacao: (l.observacao || '').trim() || null,
+      escolhida: l._i === escolhida, ordem: idx + 1,
+    }));
+    const { error } = await bd.from('cotacao').insert(rows);
+    if (error) throw new Error(traduzErro(error.message));
+  }
+  if (escolhida != null && linhas[escolhida]) {
+    const venc = linhas[escolhida];
+    const patch = { fornecedor_id: await fornecedorPorNome(empresaId, venc.fornecedor_nome) };
+    if (venc.valor !== '' && venc.valor != null) patch.valor = Number(venc.valor);
+    const { error } = await bd.from('lancamento').update(patch).eq('id', lancamentoId);
+    if (error) throw new Error(traduzErro(error.message));
+  }
+  return listarCotacoesLanc(lancamentoId);
+}
+
+/* ── documentos do lançamento (o "kit") ───────────────── */
+export async function documentosDoLancamento(lancamentoId) {
+  if (!lancamentoId) return [];
+  const { data, error } = await bd.from('documento')
+    .select('id, nome, caminho, categoria, tipo, tamanho, criado_em')
+    .eq('lancamento_id', lancamentoId).order('criado_em', { ascending: false });
+  if (error) throw new Error(traduzErro(error.message));
+  return data || [];
+}
+
+/* ── funcionários (CLT / PJ) ──────────────────────────── */
+export async function listarFuncionarios(empresaId) {
+  const { data, error } = await bd.from('funcionario')
+    .select('id, nome, cpf, tipo, documento, telefone, banco, agencia, conta, chave_pix, observacoes, ativo')
+    .eq('empresa_id', empresaId).order('nome');
+  if (error) throw new Error(traduzErro(error.message));
+  return data || [];
+}
+export async function salvarFuncionario(empresaId, id, dados) {
+  const linha = {
+    nome: dados.nome?.trim(),
+    cpf: dados.cpf?.trim() || null,
+    tipo: dados.tipo === 'pj' ? 'pj' : 'clt',
+    documento: dados.documento?.trim() || null,
+    telefone: dados.telefone?.trim() || null,
+    banco: dados.banco?.trim() || null,
+    agencia: dados.agencia?.trim() || null,
+    conta: dados.conta?.trim() || null,
+    chave_pix: dados.chave_pix?.trim() || null,
+    observacoes: dados.observacoes?.trim() || null,
+  };
+  const q = id
+    ? bd.from('funcionario').update(linha).eq('id', id)
+    : bd.from('funcionario').insert({ ...linha, empresa_id: empresaId });
+  const { data, error } = await q.select().single();
+  if (error) throw new Error(traduzErro(error.message));
+  return data;
+}
+export async function alternarFuncionario(id, ativo) {
+  const { error } = await bd.from('funcionario').update({ ativo }).eq('id', id);
+  if (error) throw new Error(traduzErro(error.message));
+}
+
+/* ── resumo dos contratos para o Painel (modelo OS) ───── */
+// Por contrato: orçado (soma das rubricas-folha) × realizado (soma dos lançamentos).
+export async function resumoContratosOS(empresaId) {
+  const { data: evs, error: e1 } = await bd.from('evento')
+    .select('id, nome, situacao, data_inicio, data_fim, cidade')
+    .eq('empresa_id', empresaId).order('criado_em', { ascending: false });
+  if (e1) throw new Error(traduzErro(e1.message));
+  const ids = (evs || []).map(e => e.id);
+  const porContrato = {};
+  (evs || []).forEach(e => { porContrato[e.id] = { ...e, orcado: 0, realizado: 0 }; });
+  if (ids.length) {
+    const [{ data: cls }, { data: lcs }] = await Promise.all([
+      bd.from('classificacao').select('evento_id, valor_orcado, eh_grupo').in('evento_id', ids),
+      bd.from('lancamento').select('evento_id, valor').in('evento_id', ids),
+    ]);
+    (cls || []).forEach(c => { if (!c.eh_grupo && porContrato[c.evento_id]) porContrato[c.evento_id].orcado += Number(c.valor_orcado || 0); });
+    (lcs || []).forEach(l => { if (porContrato[l.evento_id]) porContrato[l.evento_id].realizado += Number(l.valor || 0); });
+  }
+  return Object.values(porContrato);
+}
+
 /** Grava vários itens de uma vez. Usado pela importação. */
 export async function criarItensEmLote(eventoId, linhas) {
   const prontos = linhas.map(l => ({
@@ -1016,6 +1114,7 @@ export async function salvarDocumento(dados) {
     evento_id: dados.evento_id,
     item_id: dados.item_id || null,
     receita_id: dados.receita_id || null,
+    lancamento_id: dados.lancamento_id || null,
     categoria: dados.categoria?.trim() || null,
     nome: dados.nome?.trim() || 'documento',
     caminho: dados.caminho,
@@ -1029,10 +1128,10 @@ export async function salvarDocumento(dados) {
 }
 
 /** Sobe o arquivo e grava o registro numa tacada. */
-export async function anexarDocumento({ evento_id, item_id, receita_id, categoria, arquivo }) {
+export async function anexarDocumento({ evento_id, item_id, receita_id, lancamento_id, categoria, arquivo }) {
   const caminho = await enviarDocumento(arquivo);
   return salvarDocumento({
-    evento_id, item_id, receita_id, categoria,
+    evento_id, item_id, receita_id, lancamento_id, categoria,
     nome: arquivo.name, caminho, tipo: arquivo.type || null, tamanho: arquivo.size || null,
   });
 }
