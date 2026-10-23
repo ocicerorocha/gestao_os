@@ -705,7 +705,7 @@ export async function apagarNoClassificacao(id) {
 /** Lançamentos do contrato; filtra por rubrica se informada. */
 export async function listarLancamentos(eventoId, classificacaoId) {
   let q = bd.from('lancamento')
-    .select('id, classificacao_id, tipo, descricao, fornecedor_id, valor, data_competencia, data_pagamento, forma_pagamento, documento_numero, observacoes, fornecedor:fornecedor_id(nome)')
+    .select('id, classificacao_id, tipo, descricao, fornecedor_id, valor, data_competencia, data_pagamento, data_vencimento, forma_pagamento, documento_numero, observacoes, fornecedor:fornecedor_id(nome)')
     .eq('evento_id', eventoId);
   if (classificacaoId) q = q.eq('classificacao_id', classificacaoId);
   const { data, error } = await q.order('data_pagamento', { ascending: false, nullsFirst: false });
@@ -726,6 +726,7 @@ export async function salvarLancamento(eventoId, id, dados) {
     valor: Number(dados.valor) || 0,
     data_competencia: dados.data_competencia || null,
     data_pagamento: dados.data_pagamento || null,
+    data_vencimento: dados.data_vencimento || null,
     forma_pagamento: dados.forma_pagamento || null,
     documento_numero: (dados.documento_numero || '').trim() || null,
     observacoes: (dados.observacoes || '').trim() || null,
@@ -740,6 +741,36 @@ export async function salvarLancamento(eventoId, id, dados) {
 
 export async function apagarLancamento(id) {
   const { error } = await bd.from('lancamento').delete().eq('id', id);
+  if (error) throw new Error(traduzErro(error.message));
+}
+
+/* ── lançamentos no nível da empresa (aba Financeiro) ─── */
+// Todos os lançamentos dos contratos da empresa, com nome do
+// contrato e do fornecedor. Split pago/a pagar fica na tela.
+export async function lancamentosEmpresa(empresaId) {
+  const { data: evs, error: e1 } = await bd.from('evento')
+    .select('id, nome').eq('empresa_id', empresaId);
+  if (e1) throw new Error(traduzErro(e1.message));
+  const ids = (evs || []).map(e => e.id);
+  const nomeEv = {}; (evs || []).forEach(e => { nomeEv[e.id] = e.nome; });
+  if (!ids.length) return [];
+  const { data, error } = await bd.from('lancamento')
+    .select('id, evento_id, descricao, valor, data_competencia, data_pagamento, data_vencimento, forma_pagamento, documento_numero, fornecedor:fornecedor_id(nome), classificacao:classificacao_id(codigo, nome)')
+    .in('evento_id', ids);
+  if (error) throw new Error(traduzErro(error.message));
+  return (data || []).map(l => ({ ...l, evento_nome: nomeEv[l.evento_id] || '' }));
+}
+
+// Marca um lançamento como pago (data informada ou hoje).
+export async function marcarLancamentoPago(id, data) {
+  const { error } = await bd.from('lancamento')
+    .update({ data_pagamento: data || new Date().toISOString().slice(0, 10) }).eq('id', id);
+  if (error) throw new Error(traduzErro(error.message));
+}
+
+// Reabre um lançamento (volta para "a pagar").
+export async function reabrirLancamento(id) {
+  const { error } = await bd.from('lancamento').update({ data_pagamento: null }).eq('id', id);
   if (error) throw new Error(traduzErro(error.message));
 }
 
