@@ -63,9 +63,10 @@ async function entrarNoSistema() {
 
 /* ── estrutura interna ─────────────────────────────── */
 
-// Menu lateral, agrupado: Contratos · Cadastro · Financeiro · Documentos · Painel
+// Menu lateral: Contratos · Painel · Cadastro (recolhível) · Financeiro · Documentos
 const MENU = [
   { s: { id: 'eventos', rotulo: 'Contratos', tela: telaEventos, sempre: true } },
+  { s: { id: 'painel',  rotulo: 'Painel',    tela: telaPainelEmpresa, perm: 'ver_painel' } },
   { grupo: 'Cadastro', itens: [
     { id: 'fornecedores', rotulo: 'Fornecedores', tela: telaFornecedores, perm: 'gerir_fornecedores' },
     { id: 'funcionarios', rotulo: 'Funcionários', tela: telaFuncionarios, perm: 'gerir_fornecedores' },
@@ -74,7 +75,6 @@ const MENU = [
   ] },
   { s: { id: 'pagamentos', rotulo: 'Financeiro', tela: telaPagamentos,    pagador: true } },
   { s: { id: 'documentos', rotulo: 'Documentos', tela: telaDocumentos,    sempre: true } },
-  { s: { id: 'painel',     rotulo: 'Painel',      tela: telaPainelEmpresa, perm: 'ver_painel' } },
 ];
 const SECOES = MENU.flatMap(b => b.grupo ? b.itens : [b.s]);
 
@@ -96,12 +96,19 @@ async function montarEstrutura() {
   const pagador = admin || sessao.permissoesPagamento === true;
   const visivel = s => s.sempre || admin || (s.pagador && pagador) || (s.perm && m && m[s.perm]);
 
-  const navHTML = MENU.map(b => {
+  const navHTML = MENU.map((b, gi) => {
     if (b.grupo) {
       const itens = b.itens.filter(visivel);
       if (!itens.length) return '';
-      return `<div class="nav-grupo">${esc(b.grupo)}</div>` +
-        itens.map(s => `<button class="nav-item nav-sub" data-secao="${s.id}">${esc(s.rotulo)}</button>`).join('');
+      return `<div class="nav-grupo-bloco">
+        <button class="nav-grupo-btn" data-toggle-grupo="1">
+          <span>${esc(b.grupo)}</span>
+          <svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+        </button>
+        <div class="nav-grupo-itens">
+          ${itens.map(s => `<button class="nav-item nav-sub" data-secao="${s.id}">${esc(s.rotulo)}</button>`).join('')}
+        </div>
+      </div>`;
     }
     return visivel(b.s) ? `<button class="nav-item" data-secao="${b.s.id}">${esc(b.s.rotulo)}</button>` : '';
   }).join('');
@@ -111,7 +118,10 @@ async function montarEstrutura() {
     <div class="nav-backdrop" id="nav-backdrop" hidden></div>
     <aside class="lateral" id="lateral">
       <div class="lateral-topo">
-        <span class="marca">${esc(APP.nome)}</span>
+        <div class="topo-linha">
+          <span class="marca">${esc(APP.nome)}</span>
+          <button id="btn-olho" class="olho-btn" aria-label="Mostrar ou ocultar valores"></button>
+        </div>
         ${empresa ? `
           <span class="topo-empresa" title="Organização em que você está operando">
             ${empresa.logo_url
@@ -122,8 +132,9 @@ async function montarEstrutura() {
       </div>
       <nav class="lateral-nav">${navHTML}</nav>
       <div class="lateral-rodape">
-        <button id="btn-olho" class="rodape-btn" aria-label="Mostrar ou ocultar valores"></button>
         <button class="avatar" id="btn-conta" aria-label="Sua conta">${esc(iniciais(sessao.usuario.nome))}</button>
+        <span class="rodape-nome">${esc(sessao.usuario.nome)}</span>
+        <button class="rodape-sair" id="btn-sair" title="Sair">Sair</button>
       </div>
     </aside>
     <main class="conteudo" id="conteudo"></main>
@@ -139,10 +150,18 @@ async function montarEstrutura() {
     e.stopPropagation();
     alternarMenuConta();
   });
+  document.getElementById('btn-sair').addEventListener('click', async () => {
+    await sair(); telaLogin(entrarNoSistema);
+  });
   const olho = document.getElementById('btn-olho');
   const pintarOlho = () => { olho.innerHTML = iconeOlho(privadoAtivo()); };
   pintarOlho();
   olho.addEventListener('click', () => { alternarPrivado(); pintarOlho(); });
+
+  // grupos recolhíveis do menu (Cadastro começa fechado)
+  app.querySelectorAll('[data-toggle-grupo]').forEach(btn => {
+    btn.addEventListener('click', () => btn.closest('.nav-grupo-bloco').classList.toggle('aberto'));
+  });
 
   app.querySelectorAll('[data-secao]').forEach(b => {
     b.addEventListener('click', () => { irPara(b.dataset.secao); fecharDrawer(); });
